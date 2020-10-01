@@ -1,0 +1,9 @@
+name: 'Verify KubeBuilder PRs'
+description: 'Verify PRs for the KubeBuilder project repos & similar'
+inputs:
+  github_token:
+    description: "the github_token provided by the actions runner"
+    required: true
+runs:
+  using: docker
+  image: 'Dockerfile'
