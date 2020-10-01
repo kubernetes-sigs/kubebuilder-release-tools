@@ -17,10 +17,47 @@ limitations under the License.
 package common
 
 import (
+	"fmt"
 	"strings"
 )
 
 type PRType int
+func (t PRType) Emoji() string {
+	switch t {
+	case UncategorizedPR:
+		return "<uncategorized>"
+	case BreakingPR:
+		return emojiBreaking
+	case FeaturePR:
+		return emojiFeature
+	case BugfixPR:
+		return emojiBugfix
+	case DocsPR:
+		return emojiDocs
+	case InfraPR:
+		return emojiInfra
+	default:
+		panic(fmt.Sprintf("unrecognized PR type %v", t))
+	}
+}
+func (t PRType) String() string {
+	switch t {
+	case UncategorizedPR:
+		return "uncategorized"
+	case BreakingPR:
+		return "breaking"
+	case FeaturePR:
+		return "feature"
+	case BugfixPR:
+		return "bugfix"
+	case DocsPR:
+		return "docs"
+	case InfraPR:
+		return "infra"
+	default:
+		panic(fmt.Sprintf("unrecognized PR type %v", t))
+	}
+}
 
 const (
 	UncategorizedPR PRType = iota
