@@ -1,0 +1,26 @@
+name: golangci-lint
+
+on:
+  # run on PRs...
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+  # ... and also continuously
+  push:
+    branches:
+      - master
+
+
+jobs:
+  golangci:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v2
+        with:
+          # Required: the version of golangci-lint is required and must be
+          # specified without patch version: we always use the latest patch
+          # version.
+          version: v1.29

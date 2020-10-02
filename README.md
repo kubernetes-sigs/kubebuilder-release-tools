@@ -21,30 +21,8 @@ $ go run sigs.k8s.io/kubebuilder-release-tools/notes -r beta
 This repository acts as a GitHub action for verifying PR titles match the
 [release notes generation requirements](/VERSIONING.md), as well as some
 basic descriptiveness checks.  You can use it in your repository by adding
-a workflow (e.g. `.github/workflows/verifier.yml`) as such:
-
-```yaml
-name: PR Verifier
-
-on:
-  # NB: using `pull_request_target` runs this in the context of
-  # the base repository, so it has permission to upload to the checks API.
-  # This means changes won't kick in to this file until merged onto the
-  # main branch.
-  pull_request_target:
-    types: [opened, edited, reopened]
-
-jobs:
-  verify:
-    runs-on: ubuntu-latest
-    name: verify PR contents
-    steps:
-    - name: Verifier action
-      id: verifier
-      uses: kubernetes-sigs/kubebuilder-release-tools@v0.1
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-```
+a workflow (e.g. `.github/workflows/verifier.yml`), such as
+[sample-workflows/verifier.yml](sample-workflows/verifier.yml).
 
 The code that actually runs lives in [verify/cmd](/verify/cmd), while
 [/verify](/verify) contains a framework for running PR description checks
@@ -69,6 +47,12 @@ $ git pull --tags upstream
 $ git tag -f vX vX.Y.Z
 $ git push upstream refs/tags/vX
 ```
+
+## Common GitHub Action Workflows
+
+The [sample-workflows](/sample-workflows) directory includes workflows to
+be used across all KubeBuilder projects, such as the PR verifier, Go
+lints, etc.
 
 ## KubeBuilder Project Versioning
 

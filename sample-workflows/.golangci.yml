@@ -1,0 +1,51 @@
+run:
+  deadline: 5m
+linters-settings:
+  dupl:
+    threshold: 400
+issues:
+  # don't skip warning about doc comments
+  exclude-use-default: false
+  # restore some of the defaults
+  # (fill in the rest as needed)
+  exclude-rules:
+    - linters: [gosec]
+      path: "test/e2e/*"
+  # turn this on to ignore return value checks on
+  # * fmt.Fprintf to stdout/error
+  # * Close/Flush/Remove/RemoveAll
+  # * Setenv/UnSetenv
+  #- linters: [errcheck]
+  #  text: "Error return value of .((os\\.)?std(out|err)\\..*|.*Close|.*Flush|os\\.Remove(All)?|.*printf?|os\\.(Un)?Setenv). is not checked"
+linters:
+  disable-all: true
+  enable:
+  # keep these sorted if you modify (e.g. in vim, linewise visual + :sort)
+  - deadcode
+  - dupl
+  - errcheck
+  - exportloopref
+  - gocyclo
+  - gofmt
+  - goimports
+  - golint
+  - gosec
+  - gosimple
+  - govet
+  - ineffassign
+  - maligned
+  - misspell
+  - nakedret
+  - prealloc
+  - staticcheck
+  - structcheck
+  - typecheck
+  - unconvert
+  - unparam
+  - unused
+  - varcheck
+
+  # These may be useful, but are generally more annoying than not:
+  # - goconst  # this one doesn't quite know what is and isn't a magic string
+  # - interfacer # doesn't understand that interfaces have semantic meaning
+  # - lll # fiddly, use your best judgement

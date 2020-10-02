@@ -120,12 +120,12 @@ repository][rel-tools]:
   unless the tool mentions needing manual edits.
 
 * the [GitHub actions][action] in this repo will verify PRs using the
-  verifier code from [verify][/verify].  If you want to add new checks,
+  verifier code from [verify](/verify).  If you want to add new checks,
   you can do it there.
 
 [rel-tools]: https://sigs.k8s.io/kubebuilder-release-tools
 
-[actions-wf]: /action.yml
+[action]: /action.yml
 
 ## PR Process
 
