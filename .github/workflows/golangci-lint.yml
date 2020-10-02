@@ -1,13 +1,6 @@
 name: golangci-lint
-on:
-  # Trigger the workflow on push or pull request,
-  # but only for the master branch
-  push:
-    branches:
-      - master
-  pull_request:
-    branches:
-      - master
+on: [pull_request_target] # runs on open/sync/close by default
+
 jobs:
   golangci:
     name: lint
@@ -19,3 +12,4 @@ jobs:
         with:
           # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
           version: v1.29
+          working-directory: notes
