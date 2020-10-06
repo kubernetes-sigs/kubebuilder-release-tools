@@ -87,6 +87,10 @@ func main() {
 					errs = append(errs, "**Your PR has an issue number in the title.**\n\nThe title should just be descriptive.\nIssue numbers belong in the PR body as either `Fixes #XYZ` (if it closes the issue or PR), or something like `Related to #XYZ` (if it's just related).")
 				}
 
+				if regexp.MustCompile(`(?s)<!--.*?-->`).MatchString(pr.GetBody()) {
+					errs = append(errs, "**Your PR has comments in the description. **\n\n Please remove all comments from the description before you submit.")
+				}
+
 				if len(errs) == 0 {
 					return "Your PR description looks okay!", nil
 				}
