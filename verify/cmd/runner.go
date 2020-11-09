@@ -18,8 +18,8 @@ package main
 
 import (
 	"fmt"
-	"strings"
 	"regexp"
+	"strings"
 
 	"github.com/google/go-github/v32/github"
 
@@ -31,15 +31,17 @@ import (
 type prErrs struct {
 	errs []string
 }
+
 func (e prErrs) Error() string {
 	return fmt.Sprintf("%d issues found with your PR description", len(e.errs))
 }
+
 func (e prErrs) Help() string {
 	res := make([]string, len(e.errs))
 	for _, err := range e.errs {
 		parts := strings.Split(err, "\n")
 		for i, part := range parts[1:] {
-			parts[i+1] = "  "+part
+			parts[i+1] = "  " + part
 		}
 		res = append(res, "- "+strings.Join(parts, "\n"))
 	}
@@ -49,23 +51,15 @@ func (e prErrs) Help() string {
 func main() {
 	verify.ActionsEntrypoint(verify.RunPlugins(
 		verify.PRPlugin{
-			Name: "PR Type",
+			Name:  "PR Type",
 			Title: "PR Type in Title",
 			ProcessPR: func(pr *github.PullRequest) (string, error) {
 				return notesver.VerifyPRTitle(pr.GetTitle())
 			},
-			ForAction: func(action string) bool {
-				switch action {
-				case "opened", "edited", "reopened":
-					return true
-				default:
-					return false
-				}
-			},
 		},
 
 		verify.PRPlugin{
-			Name: "PR Desc",
+			Name:  "PR Desc",
 			Title: "Basic PR Descriptiveness Check",
 			ProcessPR: func(pr *github.PullRequest) (string, error) {
 				var errs []string
@@ -83,7 +77,7 @@ func main() {
 				}
 
 				_, title := notes.PRTypeFromTitle(pr.GetTitle())
-				if regexp.MustCompile(`#\d{1,}\b`).MatchString(title) {
+				if regexp.MustCompile(`#\d+\b`).MatchString(title) {
 					errs = append(errs, "**Your PR has an issue number in the title.**\n\nThe title should just be descriptive.\nIssue numbers belong in the PR body as either `Fixes #XYZ` (if it closes the issue or PR), or something like `Related to #XYZ` (if it's just related).")
 				}
 
@@ -91,14 +85,6 @@ func main() {
 					return "Your PR description looks okay!", nil
 				}
 				return "", prErrs{errs: errs}
-			},
-			ForAction: func(action string) bool {
-				switch action {
-				case "opened", "edited", "reopened":
-					return true
-				default:
-					return false
-				}
 			},
 		},
 	))
