@@ -17,12 +17,10 @@ limitations under the License.
 package verify
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
-	"encoding/json"
-	"errors"
-	"context"
-	"time"
 	"strings"
 	"sync"
 
@@ -30,151 +28,71 @@ import (
 	"golang.org/x/oauth2"
 )
 
-type ErrWithHelp interface {
-	error
-	Help() string
-}
-
-type PRPlugin struct {
-	ForAction func(string) bool
-	ProcessPR func(pr *github.PullRequest) (string, error)
-	Name string
-	Title string
-}
-
-func (p *PRPlugin) Entrypoint(env *ActionsEnv) error {
-	if p.ForAction != nil && !p.ForAction(env.Event.GetAction()) {
-		return nil
-	}
-
-	repoParts := strings.Split(env.Event.GetRepo().GetFullName(), "/")
-	orgName, repoName := repoParts[0], repoParts[1]
-	
-	headSHA := env.Event.GetPullRequest().GetHead().GetSHA()
-	fmt.Printf("::debug::creating check run %q on %s/%s @ %s...\n", p.Name, orgName, repoName, headSHA)
-
-	resRun, runResp, err := env.Client.Checks.CreateCheckRun(context.TODO(), orgName, repoName, github.CreateCheckRunOptions{
-		Name: p.Name,
-		HeadSHA: headSHA,
-		Status: github.String("in_progress"),
-	})
-	if err != nil {
-		return fmt.Errorf("unable to submit check result: %w", err)
-	}
-
-	env.Debugf("create check API response: %+v", runResp)
-	env.Debugf("created run: %+v", resRun)
-
-	successStatus, procErr := p.ProcessPR(env.Event.PullRequest)
-
-	var summary, fullHelp, conclusion string
-	if procErr != nil {
-		summary = procErr.Error()
-		var helpErr ErrWithHelp
-		if errors.As(procErr, &helpErr) {
-			fullHelp = helpErr.Help()
-		}
-		conclusion = "failure"
-	} else {
-		summary = "Success"
-		fullHelp = successStatus
-		conclusion = "success"
-	}
-	completedAt := github.Timestamp{Time: time.Now()}
-
-	// log in case we can't submit the result for some reason
-	env.Debugf("plugin result summary: %q", summary)
-	env.Debugf("plugin result details: %q", fullHelp)
-	env.Debugf("plugin conclusion: %q", conclusion)
-
-	resRun, updateResp, err := env.Client.Checks.UpdateCheckRun(context.TODO(), orgName, repoName, resRun.GetID(), github.UpdateCheckRunOptions{
-		Name: p.Name,
-		Status: github.String("completed"),
-		Conclusion: github.String(conclusion), 
-		CompletedAt: &completedAt,
-		Output: &github.CheckRunOutput{
-			Title: github.String(p.Title),
-			Summary: github.String(summary),
-			Text: github.String(fullHelp),
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("unable to update check result: %w", err)
-	}
-
-	env.Debugf("update check API response: %+v", updateResp)
-	env.Debugf("updated run: %+v", resRun)
-
-	// return failure here too so that the whole suite fails (since the actions
-	// suite seems to ignore failing check runs when calculating general failure)
-	if procErr != nil {
-		return fmt.Errorf("failed: %v", procErr)
-	}
-	return nil
-}
+var log logger
 
 type ActionsEnv struct {
-	Event *github.PullRequestEvent
+	Owner  string
+	Repo   string
+	Event  *github.PullRequestEvent
 	Client *github.Client
 }
-func (ActionsEnv) Errorf(fmtStr string, args ...interface{}) {
-	fmt.Printf("::error::"+fmtStr+"\n", args...)
-}
-func (ActionsEnv) Debugf(fmtStr string, args ...interface{}) {
-	fmt.Printf("::debug::"+fmtStr+"\n", args...)
-}
-func (ActionsEnv) Warnf(fmtStr string, args ...interface{}) {
-	fmt.Printf("::warning::"+fmtStr+"\n", args...)
-}
 
-func SetupEnv() (*ActionsEnv, error) {
+func setupEnv() (*ActionsEnv, error) {
 	if os.Getenv("GITHUB_ACTIONS") != "true" {
 		return nil, fmt.Errorf("not running in an action, bailing.  Set GITHUB_ACTIONS and the other appropriate env vars if you really want to do this.")
 	}
 
-	payloadPath := os.Getenv("GITHUB_EVENT_PATH")
-	if payloadPath == "" {
-		return nil, fmt.Errorf("no payload path set, something weird is up")
+	// Get owner and repository
+	ownerAndRepo := strings.Split(os.Getenv("GITHUB_REPOSITORY"), "/")
+
+	// Get event path
+	eventPath := os.Getenv("GITHUB_EVENT_PATH")
+	if eventPath == "" {
+		return nil, fmt.Errorf("no event path set, something weird is up")
 	}
 
-	payload, err := func() (github.PullRequestEvent, error) {
-		payloadRaw, err := os.Open(payloadPath)
+	// Parse the event
+	event, err := func() (github.PullRequestEvent, error) {
+		eventFile, err := os.Open(eventPath)
 		if err != nil {
-			return github.PullRequestEvent{}, fmt.Errorf("unable to load payload file: %w", err)
+			return github.PullRequestEvent{}, fmt.Errorf("unable to load event file: %w", err)
 		}
-		defer payloadRaw.Close()
-		
-		var payload github.PullRequestEvent
-		if err := json.NewDecoder(payloadRaw).Decode(&payload); err != nil {
-			return payload, fmt.Errorf("unable to unmarshal payload: %w", err) 
+		defer eventFile.Close()
+
+		var event github.PullRequestEvent
+		if err := json.NewDecoder(eventFile).Decode(&event); err != nil {
+			return event, fmt.Errorf("unable to unmarshal event: %w", err)
 		}
-		return payload, nil
+		return event, nil
 	}()
 	if err != nil {
 		return nil, err
 	}
 
-	ctx := context.Background()
-	authClient := oauth2.NewClient(ctx, oauth2.StaticTokenSource(
+	// Create the client
+	client := github.NewClient(oauth2.NewClient(context.Background(), oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: os.Getenv("INPUT_GITHUB_TOKEN")},
-	))
+	)))
 
 	return &ActionsEnv{
-		Event: &payload,
-		Client: github.NewClient(authClient),
+		Owner:  ownerAndRepo[0],
+		Repo:   ownerAndRepo[1],
+		Event:  &event,
+		Client: client,
 	}, nil
 }
 
 type ActionsCallback func(*ActionsEnv) error
+
 func ActionsEntrypoint(cb ActionsCallback) {
-	env, err := SetupEnv()
+	env, err := setupEnv()
 	if err != nil {
-		env.Errorf("%v", err)
+		log.errorf("%v", err)
 		os.Exit(1)
 	}
 
 	if err := cb(env); err != nil {
-		env.Errorf("%v", err)
+		log.errorf("%v", err)
 		os.Exit(2)
 	}
 	fmt.Println("Success!")
@@ -189,7 +107,7 @@ func RunPlugins(plugins ...PRPlugin) ActionsCallback {
 			done.Add(1)
 			go func(plugin PRPlugin) {
 				defer done.Done()
-				res <- plugin.Entrypoint(env)
+				res <- plugin.entrypoint(env)
 			}(plugin)
 		}
 
@@ -204,7 +122,7 @@ func RunPlugins(plugins ...PRPlugin) ActionsCallback {
 				continue
 			}
 			errCount++
-			env.Errorf("%v", err)
+			log.errorf("%v", err)
 		}
 
 		fmt.Printf("%d plugins ran\n", len(plugins))
