@@ -32,7 +32,7 @@ on:
   # This means changes won't kick in to this file until merged onto the
   # main branch.
   pull_request_target:
-    types: [opened, edited, reopened]
+    types: [opened, edited, reopened, synchronize]
 
 jobs:
   verify:
@@ -41,7 +41,7 @@ jobs:
     steps:
     - name: Verifier action
       id: verifier
-      uses: kubernetes-sigs/kubebuilder-release-tools@v0.1
+      uses: kubernetes-sigs/kubebuilder-release-tools@v0.2
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
 ```
