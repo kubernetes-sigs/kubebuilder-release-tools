@@ -318,7 +318,9 @@ func (p PRPlugin) onSync(env *ActionsEnv) error {
 	// Rerun the tests if they weren't finished
 	if !Finished.Equal(checkRun.GetStatus()) {
 		// Process the PR and submit the results
-		return p.processAndSubmit(env, checkRun)
+		if err = p.processAndSubmit(env, checkRun); err != nil {
+			return err
+		}
 	}
 
 	// Create a duplicate for the new commit
