@@ -81,21 +81,22 @@ func (p PRPlugin) processPR(pr *github.PullRequest) (conclusion, summary, text s
 }
 
 // processAndSubmit performs the checks and submits the result
-func (p PRPlugin) processAndSubmit(env *ActionsEnv, checkRun *github.CheckRun) error {
+func (p PRPlugin) processAndSubmit(env *ActionsEnv, checkRun *github.CheckRun) (*github.CheckRun, error) {
 	// Process the PR
 	conclusion, summary, text, procErr := p.processPR(env.Event.PullRequest)
 
 	// Update the check run
-	if err := p.finishCheckRun(env.Client, env.Owner, env.Repo, checkRun.GetID(), conclusion, summary, text); err != nil {
-		return err
+	checkRun, err := p.finishCheckRun(env.Client, env.Owner, env.Repo, checkRun.GetID(), conclusion, summary, text)
+	if err != nil {
+		return checkRun, err
 	}
 
 	// Return failure here too so that the whole suite fails (since the actions
 	// suite seems to ignore failing check runs when calculating general failure)
 	if procErr != nil {
-		return fmt.Errorf("failed: %v", procErr)
+		return checkRun, fmt.Errorf("failed: %v", procErr)
 	}
-	return nil
+	return checkRun, nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -168,7 +169,7 @@ func (p PRPlugin) getCheckRun(client *github.Client, owner, repo, headSHA string
 // or if it exists but couldn't be updated.
 func (p PRPlugin) resetCheckRun(client *github.Client, owner, repo string, headSHA string) (*github.CheckRun, error) {
 	checkRun, err := p.getCheckRun(client, owner, repo, headSHA)
-	// If it was created we don't need to update it, check its status
+	// If it errored, or it was created but not finished, we don't need to update it
 	if err != nil || Started.Equal(checkRun.GetStatus()) {
 		return checkRun, err
 	}
@@ -197,7 +198,7 @@ func (p PRPlugin) resetCheckRun(client *github.Client, owner, repo string, headS
 
 // finishCheckRun updates the Check-Run with id checkRunID setting its output.
 // It returns an error in case it couldn't be updated.
-func (p PRPlugin) finishCheckRun(client *github.Client, owner, repo string, checkRunID int64, conclusion, summary, text string) error {
+func (p PRPlugin) finishCheckRun(client *github.Client, owner, repo string, checkRunID int64, conclusion, summary, text string) (*github.CheckRun, error) {
 	p.Debugf("adding results to check run %q on %s/%s...", p.Name, owner, repo)
 
 	checkRun, updateResp, err := client.Checks.UpdateCheckRun(context.TODO(), owner, repo, checkRunID, github.UpdateCheckRunOptions{
@@ -215,9 +216,9 @@ func (p PRPlugin) finishCheckRun(client *github.Client, owner, repo string, chec
 	p.Debugf("updated run: %+v", checkRun)
 
 	if err != nil {
-		return fmt.Errorf("unable to update check run with results: %w", err)
+		return checkRun, fmt.Errorf("unable to update check run with results: %w", err)
 	}
-	return nil
+	return checkRun, nil
 }
 
 // duplicateCheckRun creates a new Check-Run with the same info as the provided one but for a new headSHA
@@ -275,25 +276,22 @@ func (p PRPlugin) entrypoint(env *ActionsEnv) (err error) {
 // onOpen handles "open" actions
 func (p PRPlugin) onOpen(env *ActionsEnv) error {
 	p.Debugf("%q handler", actionOpen)
-	headSHA := env.Event.GetPullRequest().GetHead().GetSHA()
-
 	// Create the check run
-	checkRun, err := p.createCheckRun(env.Client, env.Owner, env.Repo, headSHA)
+	checkRun, err := p.createCheckRun(env.Client, env.Owner, env.Repo, env.Event.GetPullRequest().GetHead().GetSHA())
 	if err != nil {
 		return err
 	}
 
 	// Process the PR and submit the results
-	return p.processAndSubmit(env, checkRun)
+	_, err = p.processAndSubmit(env, checkRun)
+	return err
 }
 
 // onReopen handles "reopen" actions
 func (p PRPlugin) onReopen(env *ActionsEnv) error {
 	p.Debugf("%q handler", actionReopen)
-	headSHA := env.Event.GetPullRequest().GetHead().GetSHA()
-
 	// Get the check run
-	checkRun, err := p.getCheckRun(env.Client, env.Owner, env.Repo, headSHA)
+	checkRun, err := p.getCheckRun(env.Client, env.Owner, env.Repo, env.Event.GetPullRequest().GetHead().GetSHA())
 	if err != nil {
 		return err
 	}
@@ -301,7 +299,8 @@ func (p PRPlugin) onReopen(env *ActionsEnv) error {
 	// Rerun the tests if they weren't finished
 	if !Finished.Equal(checkRun.GetStatus()) {
 		// Process the PR and submit the results
-		return p.processAndSubmit(env, checkRun)
+		_, err = p.processAndSubmit(env, checkRun)
+		return err
 	}
 
 	// Return failure here too so that the whole suite fails (since the actions
@@ -315,25 +314,22 @@ func (p PRPlugin) onReopen(env *ActionsEnv) error {
 // onEdit handles "edit" actions
 func (p PRPlugin) onEdit(env *ActionsEnv) error {
 	p.Debugf("%q handler", actionEdit)
-	headSHA := env.Event.GetPullRequest().GetHead().GetSHA()
-
 	// Reset the check run
-	checkRun, err := p.resetCheckRun(env.Client, env.Owner, env.Repo, headSHA)
+	checkRun, err := p.resetCheckRun(env.Client, env.Owner, env.Repo, env.Event.GetPullRequest().GetHead().GetSHA())
 	if err != nil {
 		return err
 	}
 
 	// Process the PR and submit the results
-	return p.processAndSubmit(env, checkRun)
+	_, err = p.processAndSubmit(env, checkRun)
+	return err
 }
 
 // onSync handles "synchronize" actions
 func (p PRPlugin) onSync(env *ActionsEnv) error {
 	p.Debugf("%q handler", actionSync)
-	before, after := env.Event.GetBefore(), env.Event.GetAfter()
-
 	// Get the check run
-	checkRun, err := p.getCheckRun(env.Client, env.Owner, env.Repo, before)
+	checkRun, err := p.getCheckRun(env.Client, env.Owner, env.Repo, env.Event.GetBefore())
 	if err != nil {
 		return err
 	}
@@ -341,11 +337,14 @@ func (p PRPlugin) onSync(env *ActionsEnv) error {
 	// Rerun the tests if they weren't finished
 	if !Finished.Equal(checkRun.GetStatus()) {
 		// Process the PR and submit the results
-		return p.processAndSubmit(env, checkRun)
+		checkRun, err = p.processAndSubmit(env, checkRun)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Create a duplicate for the new commit
-	checkRun, err = p.duplicateCheckRun(env.Client, env.Owner, env.Repo, after, checkRun)
+	checkRun, err = p.duplicateCheckRun(env.Client, env.Owner, env.Repo, env.Event.GetAfter(), checkRun)
 	if err != nil {
 		return err
 	}
