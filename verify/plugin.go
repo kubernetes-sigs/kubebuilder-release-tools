@@ -176,31 +176,6 @@ func (p PRPlugin) resetCheckRun(client *github.Client, owner, repo string, headS
 	return checkRun, nil
 }
 
-// rebindCheckRun modifies the bound commit to the Check-Run with id checkRunID to headSHA.
-// It returns an error in case it couldn't be rebound.
-func (p PRPlugin) rebindCheckRun(client *github.Client, owner, repo string, checkRunID int64, headSHA string) error {
-	p.debugf("updating check run %q on %s/%s...", p.Name, owner, repo)
-
-	checkRun, updateResp, err := client.Checks.UpdateCheckRun(
-		context.TODO(),
-		owner,
-		repo,
-		checkRunID,
-		github.UpdateCheckRunOptions{
-			Name:    p.Name,
-			HeadSHA: github.String(headSHA),
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("unable to update check result: %w", err)
-	}
-
-	p.debugf("update check API response: %+v", updateResp)
-	p.debugf("updated run: %+v", checkRun)
-
-	return nil
-}
-
 // finishCheckRun updates the Check-Run with id checkRunID setting its output.
 // It returns an error in case it couldn't be updated.
 func (p PRPlugin) finishCheckRun(client *github.Client, owner, repo string, checkRunID int64, conclusion, summary, text string) error {
@@ -224,6 +199,36 @@ func (p PRPlugin) finishCheckRun(client *github.Client, owner, repo string, chec
 	p.debugf("updated run: %+v", checkRun)
 
 	return nil
+}
+
+// duplicateCheckRun creates a new Check-Run with the same info as the provided one but for a new headSHA
+func (p PRPlugin) duplicateCheckRun(client *github.Client, owner, repo, headSHA string, checkRun *github.CheckRun) (*github.CheckRun, error) {
+	p.debugf("creating check run %q on %s/%s @ %s...", p.Name, owner, repo, headSHA)
+
+	checkRun, res, err := client.Checks.CreateCheckRun(
+		context.TODO(),
+		owner,
+		repo,
+		github.CreateCheckRunOptions{
+			Name:        p.Name,
+			HeadSHA:     headSHA,
+			DetailsURL:  checkRun.DetailsURL,
+			ExternalID:  checkRun.ExternalID,
+			Status:      checkRun.Status,
+			Conclusion:  checkRun.Conclusion,
+			StartedAt:   checkRun.StartedAt,
+			CompletedAt: checkRun.CompletedAt,
+			Output:      checkRun.Output,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("unable to submit check result: %w", err)
+	}
+
+	p.debugf("create check API response: %+v", res)
+	p.debugf("created run: %+v", checkRun)
+
+	return checkRun, nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -310,15 +315,16 @@ func (p PRPlugin) onSync(env *ActionsEnv) error {
 		return err
 	}
 
-	// Rebind the check run
-	if err := p.rebindCheckRun(env.Client, env.Owner, env.Repo, checkRun.GetID(), after); err != nil {
-		return err
-	}
-
 	// Rerun the tests if they weren't finished
 	if !Finished.Equal(checkRun.GetStatus()) {
 		// Process the PR and submit the results
 		return p.processAndSubmit(env, checkRun)
+	}
+
+	// Create a duplicate for the new commit
+	checkRun, err = p.duplicateCheckRun(env.Client, env.Owner, env.Repo, after, checkRun)
+	if err != nil {
+		return err
 	}
 
 	// Return failure here too so that the whole suite fails (since the actions
