@@ -4,6 +4,10 @@ inputs:
   github_token:
     description: "the github_token provided by the actions runner"
     required: true
+  suffix:
+    description: "suffix for Check Run names"
+    required: false
+    default: ""
 runs:
   using: docker
   image: '../../../Dockerfile'

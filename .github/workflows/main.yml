@@ -6,7 +6,7 @@ on:
 
 jobs:
   verify:
-    name: Verify PR contents
+    name: Verify PR contents (${{ github.repository }}:${{ github.base_ref }})
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -15,3 +15,18 @@ jobs:
         uses: ./.github/actions/verifier
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+
+  verify-pr:
+    name: Verify PR contents (${{ github.event.pull_request.head.repo.full_name }}:${{ github.head_ref }})
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.head_ref }}
+      - name: Verifier action
+        uses: ./.github/actions/verifier
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          suffix: (${{ github.event.pull_request.head.repo.full_name }}:${{ github.head_ref }})

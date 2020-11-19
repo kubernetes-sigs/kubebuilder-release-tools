@@ -35,6 +35,7 @@ type ActionsEnv struct {
 	Repo   string
 	Event  *github.PullRequestEvent
 	Client *github.Client
+	Suffix string
 }
 
 func setupEnv() (*ActionsEnv, error) {
@@ -79,6 +80,7 @@ func setupEnv() (*ActionsEnv, error) {
 		Repo:   ownerAndRepo[1],
 		Event:  &event,
 		Client: client,
+		Suffix: os.Getenv("INPUT_SUFFIX"),
 	}, nil
 }
 
@@ -104,6 +106,10 @@ func RunPlugins(plugins ...PRPlugin) ActionsCallback {
 		var done sync.WaitGroup
 
 		for _, plugin := range plugins {
+			if env.Suffix != "" {
+				plugin.Name += " " + env.Suffix
+			}
+
 			done.Add(1)
 			go func(plugin PRPlugin) {
 				defer done.Done()

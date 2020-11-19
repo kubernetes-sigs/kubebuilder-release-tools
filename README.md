@@ -50,8 +50,8 @@ The code that actually runs lives in [verify/cmd](/verify/cmd), while
 [/verify](/verify) contains a framework for running PR description checks
 from GitHub actions & uploading the result via the GitHub checks API.
 
-This repo itself uses a "live" version of the action that always rebuilds
-from the local code (master branch), which lives in 
+This repo itself uses two "live" version of the action that always rebuilds
+from the local code (master branch) and from the PR branch, which lives in 
 [.github/actions/verifier](/.github/actions/verifier).
 
 ### Updating the action
