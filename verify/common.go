@@ -91,6 +91,7 @@ func ActionsEntrypoint(cb ActionsCallback) {
 	if err != nil {
 		l.Fatalf(1, "%v", err)
 	}
+	l.Debugf("environment for %s/%s ready", env.Owner, env.Repo)
 
 	if err := cb(env); err != nil {
 		l.Fatalf(2, "%v", err)
@@ -99,11 +100,13 @@ func ActionsEntrypoint(cb ActionsCallback) {
 }
 
 func RunPlugins(plugins ...PRPlugin) ActionsCallback {
+	l.Debugf("creating cb for %d plugins", len(plugins))
 	return func(env *ActionsEnv) error {
 		res := make(chan error)
 		var done sync.WaitGroup
 
 		for _, plugin := range plugins {
+			l.Debugf("launching %q plugin", plugin.Name)
 			done.Add(1)
 			go func(plugin PRPlugin) {
 				defer done.Done()
@@ -117,6 +120,7 @@ func RunPlugins(plugins ...PRPlugin) ActionsCallback {
 			close(res)
 		}()
 
+		l.Debug("retrieving plugin results")
 		errCount := 0
 		for err := range res {
 			if err == nil {
