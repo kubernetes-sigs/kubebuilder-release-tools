@@ -1,16 +1,17 @@
+name: PR Verifier
+
 on:
   pull_request_target:
     types: [opened, edited, reopened, synchronize]
 
 jobs:
   verify:
+    name: Verify PR contents
     runs-on: ubuntu-latest
-    name: verify PR contents
     steps:
-    - name: Checkout
-      uses: actions/checkout@v2
-    - name: Verifier action
-      id: verifier
-      uses: ./action-nightly
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Verifier action
+        uses: ./.github/actions/verifier
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}

@@ -18,18 +18,31 @@ package verify
 
 import (
 	"fmt"
+	"strings"
+)
+
+const (
+	errorPrefix   = "::error::"
+	debugPrefix   = "::debug::"
+	warningPrefix = "::debug::"
 )
 
 type logger struct{}
 
-func (logger) errorf(format string, args ...interface{}) {
-	fmt.Printf("::error::"+format+"\n", args...)
+func (logger) log(prefix, content string) {
+	for _, s := range strings.Split(content, "\n") {
+		fmt.Println(prefix + s)
+	}
 }
 
-func (logger) debugf(format string, args ...interface{}) {
-	fmt.Printf("::debug::"+format+"\n", args...)
+func (l logger) errorf(format string, args ...interface{}) {
+	l.log(errorPrefix, fmt.Sprintf(format, args...))
 }
 
-func (logger) warningf(format string, args ...interface{}) {
-	fmt.Printf("::warning::"+format+"\n", args...)
+func (l logger) debugf(format string, args ...interface{}) {
+	l.log(debugPrefix, fmt.Sprintf(format, args...))
+}
+
+func (l logger) warningf(format string, args ...interface{}) {
+	l.log(warningPrefix, fmt.Sprintf(format, args...))
 }
