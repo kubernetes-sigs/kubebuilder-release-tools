@@ -26,9 +26,11 @@ import (
 
 	"github.com/google/go-github/v32/github"
 	"golang.org/x/oauth2"
+
+	"sigs.k8s.io/kubebuilder-release-tools/verify/pkg/log"
 )
 
-var log logger
+var l = log.New()
 
 type ActionsEnv struct {
 	Owner  string
@@ -87,15 +89,13 @@ type ActionsCallback func(*ActionsEnv) error
 func ActionsEntrypoint(cb ActionsCallback) {
 	env, err := setupEnv()
 	if err != nil {
-		log.errorf("%v", err)
-		os.Exit(1)
+		l.Fatalf(1, "%v", err)
 	}
 
 	if err := cb(env); err != nil {
-		log.errorf("%v", err)
-		os.Exit(2)
+		l.Fatalf(2, "%v", err)
 	}
-	fmt.Println("Success!")
+	l.Info("Success!")
 }
 
 func RunPlugins(plugins ...PRPlugin) ActionsCallback {
@@ -107,6 +107,7 @@ func RunPlugins(plugins ...PRPlugin) ActionsCallback {
 			done.Add(1)
 			go func(plugin PRPlugin) {
 				defer done.Done()
+				plugin.init()
 				res <- plugin.entrypoint(env)
 			}(plugin)
 		}
@@ -122,10 +123,10 @@ func RunPlugins(plugins ...PRPlugin) ActionsCallback {
 				continue
 			}
 			errCount++
-			log.errorf("%v", err)
+			l.Errorf("%v", err)
 		}
 
-		fmt.Printf("%d plugins ran\n", len(plugins))
+		l.Infof("%d plugins ran", len(plugins))
 		if errCount > 0 {
 			return fmt.Errorf("%d plugins had errors", errCount)
 		}

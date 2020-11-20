@@ -51,7 +51,8 @@ The code that actually runs lives in [verify/cmd](/verify/cmd), while
 from GitHub actions & uploading the result via the GitHub checks API.
 
 This repo itself uses a "live" version of the action that always rebuilds
-from the local code, which lives in [action-nightly](/action-nightly).
+from the local code (master branch), which lives in 
+[.github/actions/verifier](/.github/actions/verifier).
 
 ### Updating the action
 
