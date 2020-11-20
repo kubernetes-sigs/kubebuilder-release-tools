@@ -14,22 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package verify
+package log
 
-import (
-	"fmt"
-)
-
-type logger struct{}
-
-func (logger) errorf(format string, args ...interface{}) {
-	fmt.Printf("::error::"+format+"\n", args...)
-}
-
-func (logger) debugf(format string, args ...interface{}) {
-	fmt.Printf("::debug::"+format+"\n", args...)
-}
-
-func (logger) warningf(format string, args ...interface{}) {
-	fmt.Printf("::warning::"+format+"\n", args...)
+type Logger interface {
+	Debug(content string)
+	Debugf(format string, args ...interface{})
+	Info(content string)
+	Infof(format string, args ...interface{})
+	Warning(content string)
+	Warningf(format string, args ...interface{})
+	Error(content string)
+	Errorf(format string, args ...interface{})
+	Fatal(exitCode int, content string)
+	Fatalf(exitCode int, format string, args ...interface{})
 }

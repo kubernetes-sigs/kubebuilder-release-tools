@@ -23,6 +23,8 @@ import (
 	"time"
 
 	"github.com/google/go-github/v32/github"
+
+	"sigs.k8s.io/kubebuilder-release-tools/verify/pkg/log"
 )
 
 // ErrorWithHelp allows PRPlugin.ProcessPR to provide extended descriptions
@@ -37,7 +39,12 @@ type PRPlugin struct {
 	Name      string
 	Title     string
 
-	logger
+	log.Logger
+}
+
+// init initializes the PRPlugin
+func (p *PRPlugin) init() {
+	p.Logger = log.NewFor(p.Name)
 }
 
 // processPR executes the provided ProcessPR and parses the result
@@ -57,9 +64,9 @@ func (p PRPlugin) processPR(pr *github.PullRequest) (conclusion, summary, text s
 	}
 
 	// Log in case we can't submit the result for some reason
-	p.debugf("plugin conclusion: %q", conclusion)
-	p.debugf("plugin result summary: %q", summary)
-	p.debugf("plugin result details: %q", text)
+	p.Debugf("plugin conclusion: %q", conclusion)
+	p.Debugf("plugin result summary: %q", summary)
+	p.Debugf("plugin result details: %q", text)
 
 	return conclusion, summary, text, err
 }
@@ -89,7 +96,7 @@ func (p PRPlugin) processAndSubmit(env *ActionsEnv, checkRun *github.CheckRun) e
 // createCheckRun creates a new Check-Run.
 // It returns an error in case it couldn't be created.
 func (p PRPlugin) createCheckRun(client *github.Client, owner, repo, headSHA string) (*github.CheckRun, error) {
-	p.debugf("creating check run %q on %s/%s @ %s...", p.Name, owner, repo, headSHA)
+	p.Debugf("creating check run %q on %s/%s @ %s...", p.Name, owner, repo, headSHA)
 
 	checkRun, res, err := client.Checks.CreateCheckRun(
 		context.TODO(),
@@ -101,20 +108,20 @@ func (p PRPlugin) createCheckRun(client *github.Client, owner, repo, headSHA str
 			Status:  Started.StringP(),
 		},
 	)
+
+	p.Debugf("create check API response: %+v", res)
+	p.Debugf("created run: %+v", checkRun)
+
 	if err != nil {
-		return nil, fmt.Errorf("unable to submit check result: %w", err)
+		return nil, fmt.Errorf("unable to create check run: %w", err)
 	}
-
-	p.debugf("create check API response: %+v", res)
-	p.debugf("created run: %+v", checkRun)
-
 	return checkRun, nil
 }
 
 // getCheckRun returns the Check-Run, creating it if it doesn't exist.
 // It returns an error in case it didn't exist and couldn't be created, or if there are multiple matches.
 func (p PRPlugin) getCheckRun(client *github.Client, owner, repo, headSHA string) (*github.CheckRun, error) {
-	p.debugf("getting check run %q on %s/%s @ %s...", p.Name, owner, repo, headSHA)
+	p.Debugf("getting check run %q on %s/%s @ %s...", p.Name, owner, repo, headSHA)
 
 	checkRunList, res, err := client.Checks.ListCheckRunsForRef(
 		context.TODO(),
@@ -125,12 +132,13 @@ func (p PRPlugin) getCheckRun(client *github.Client, owner, repo, headSHA string
 			CheckName: github.String(p.Name),
 		},
 	)
-	if err != nil {
-		return nil, err
-	}
 
-	p.debugf("list check API response: %+v", res)
-	p.debugf("listed runs: %+v", checkRunList)
+	p.Debugf("list check API response: %+v", res)
+	p.Debugf("listed runs: %+v", checkRunList)
+
+	if err != nil {
+		return nil, fmt.Errorf("unable to get check run: %w", err)
+	}
 
 	switch n := *checkRunList.Total; {
 	case n == 0:
@@ -138,9 +146,11 @@ func (p PRPlugin) getCheckRun(client *github.Client, owner, repo, headSHA string
 	case n == 1:
 		return checkRunList.CheckRuns[0], nil
 	case n > 1:
-		return nil, fmt.Errorf("multiple instances of `%s` check run found on %s/%s @ %s", p.Name, owner, repo, headSHA)
+		return nil, fmt.Errorf("multiple instances of `%s` check run found on %s/%s @ %s",
+			p.Name, owner, repo, headSHA)
 	default: // Should never happen
-		return nil, fmt.Errorf("negative number of instances (%d) of `%s` check run found on %s/%s @ %s", n, p.Name, owner, repo, headSHA)
+		return nil, fmt.Errorf("negative number of instances (%d) of `%s` check run found on %s/%s @ %s",
+			n, p.Name, owner, repo, headSHA)
 	}
 }
 
@@ -154,7 +164,7 @@ func (p PRPlugin) resetCheckRun(client *github.Client, owner, repo string, headS
 		return checkRun, err
 	}
 
-	p.debugf("updating check run %q on %s/%s...", p.Name, owner, repo)
+	p.Debugf("resetting check run %q on %s/%s...", p.Name, owner, repo)
 
 	checkRun, updateResp, err := client.Checks.UpdateCheckRun(
 		context.TODO(),
@@ -166,20 +176,20 @@ func (p PRPlugin) resetCheckRun(client *github.Client, owner, repo string, headS
 			Status: github.String("in-progress"),
 		},
 	)
+
+	p.Debugf("update check API response: %+v", updateResp)
+	p.Debugf("updated run: %+v", checkRun)
+
 	if err != nil {
-		return checkRun, fmt.Errorf("unable to update check result: %w", err)
+		return checkRun, fmt.Errorf("unable to reset check run: %w", err)
 	}
-
-	p.debugf("update check API response: %+v", updateResp)
-	p.debugf("updated run: %+v", checkRun)
-
 	return checkRun, nil
 }
 
 // finishCheckRun updates the Check-Run with id checkRunID setting its output.
 // It returns an error in case it couldn't be updated.
 func (p PRPlugin) finishCheckRun(client *github.Client, owner, repo string, checkRunID int64, conclusion, summary, text string) error {
-	p.debugf("updating check run %q on %s/%s...", p.Name, owner, repo)
+	p.Debugf("adding results to check run %q on %s/%s...", p.Name, owner, repo)
 
 	checkRun, updateResp, err := client.Checks.UpdateCheckRun(context.TODO(), owner, repo, checkRunID, github.UpdateCheckRunOptions{
 		Name:        p.Name,
@@ -191,19 +201,19 @@ func (p PRPlugin) finishCheckRun(client *github.Client, owner, repo string, chec
 			Text:    github.String(text),
 		},
 	})
+
+	p.Debugf("update check API response: %+v", updateResp)
+	p.Debugf("updated run: %+v", checkRun)
+
 	if err != nil {
-		return fmt.Errorf("unable to update check result: %w", err)
+		return fmt.Errorf("unable to update check run with results: %w", err)
 	}
-
-	p.debugf("update check API response: %+v", updateResp)
-	p.debugf("updated run: %+v", checkRun)
-
 	return nil
 }
 
 // duplicateCheckRun creates a new Check-Run with the same info as the provided one but for a new headSHA
 func (p PRPlugin) duplicateCheckRun(client *github.Client, owner, repo, headSHA string, checkRun *github.CheckRun) (*github.CheckRun, error) {
-	p.debugf("creating check run %q on %s/%s @ %s...", p.Name, owner, repo, headSHA)
+	p.Debugf("duplicating check run %q on %s/%s @ %s...", p.Name, owner, repo, headSHA)
 
 	checkRun, res, err := client.Checks.CreateCheckRun(
 		context.TODO(),
@@ -221,13 +231,13 @@ func (p PRPlugin) duplicateCheckRun(client *github.Client, owner, repo, headSHA 
 			Output:      checkRun.Output,
 		},
 	)
+
+	p.Debugf("create check API response: %+v", res)
+	p.Debugf("created run: %+v", checkRun)
+
 	if err != nil {
-		return nil, fmt.Errorf("unable to submit check result: %w", err)
+		return checkRun, fmt.Errorf("unable to duplicate check run: %w", err)
 	}
-
-	p.debugf("create check API response: %+v", res)
-	p.debugf("created run: %+v", checkRun)
-
 	return checkRun, nil
 }
 
