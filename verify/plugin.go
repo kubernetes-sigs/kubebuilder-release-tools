@@ -27,6 +27,13 @@ import (
 	"sigs.k8s.io/kubebuilder-release-tools/verify/pkg/log"
 )
 
+const (
+	actionOpen   = "opened"
+	actionReopen = "reopened"
+	actionEdit   = "edited"
+	actionSync   = "synchronize"
+)
+
 // ErrorWithHelp allows PRPlugin.ProcessPR to provide extended descriptions
 type ErrorWithHelp interface {
 	error
@@ -45,10 +52,12 @@ type PRPlugin struct {
 // init initializes the PRPlugin
 func (p *PRPlugin) init() {
 	p.Logger = log.NewFor(p.Name)
+	p.Debug("plugin initialized")
 }
 
 // processPR executes the provided ProcessPR and parses the result
 func (p PRPlugin) processPR(pr *github.PullRequest) (conclusion, summary, text string, err error) {
+	p.Debug("execute the plugin checks")
 	text, err = p.ProcessPR(pr)
 
 	if err != nil {
@@ -173,7 +182,7 @@ func (p PRPlugin) resetCheckRun(client *github.Client, owner, repo string, headS
 		checkRun.GetID(),
 		github.UpdateCheckRunOptions{
 			Name:   p.Name,
-			Status: github.String("in-progress"),
+			Status: Started.StringP(),
 		},
 	)
 
@@ -248,16 +257,16 @@ func (p PRPlugin) duplicateCheckRun(client *github.Client, owner, repo, headSHA 
 // entrypoint will call the corresponding handler
 func (p PRPlugin) entrypoint(env *ActionsEnv) (err error) {
 	switch env.Event.GetAction() {
-	case "open":
+	case actionOpen:
 		err = p.onOpen(env)
-	case "reopen":
+	case actionReopen:
 		err = p.onReopen(env)
-	case "edit":
+	case actionEdit:
 		err = p.onEdit(env)
-	case "synchronize":
+	case actionSync:
 		err = p.onSync(env)
 	default:
-		// Do nothing
+		p.Warningf("action %q received with no defined procedure, skipping", env.Event.GetAction())
 	}
 
 	return
@@ -265,6 +274,7 @@ func (p PRPlugin) entrypoint(env *ActionsEnv) (err error) {
 
 // onOpen handles "open" actions
 func (p PRPlugin) onOpen(env *ActionsEnv) error {
+	p.Debugf("%q handler", actionOpen)
 	headSHA := env.Event.GetPullRequest().GetHead().GetSHA()
 
 	// Create the check run
@@ -279,6 +289,7 @@ func (p PRPlugin) onOpen(env *ActionsEnv) error {
 
 // onReopen handles "reopen" actions
 func (p PRPlugin) onReopen(env *ActionsEnv) error {
+	p.Debugf("%q handler", actionReopen)
 	headSHA := env.Event.GetPullRequest().GetHead().GetSHA()
 
 	// Get the check run
@@ -303,6 +314,7 @@ func (p PRPlugin) onReopen(env *ActionsEnv) error {
 
 // onEdit handles "edit" actions
 func (p PRPlugin) onEdit(env *ActionsEnv) error {
+	p.Debugf("%q handler", actionEdit)
 	headSHA := env.Event.GetPullRequest().GetHead().GetSHA()
 
 	// Reset the check run
@@ -317,6 +329,7 @@ func (p PRPlugin) onEdit(env *ActionsEnv) error {
 
 // onSync handles "synchronize" actions
 func (p PRPlugin) onSync(env *ActionsEnv) error {
+	p.Debugf("%q handler", actionSync)
 	before, after := env.Event.GetBefore(), env.Event.GetAfter()
 
 	// Get the check run
