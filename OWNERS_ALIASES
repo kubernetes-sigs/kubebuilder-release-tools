@@ -12,15 +12,15 @@ aliases:
   kubebuilder-approvers:
     - camilamacedo86
     - vincepri
+    - adirio
 
   # folks who can review and LGTM any PRs in the repo (doesn't include
   # approvers & admins -- those count too via the OWNERS file)
   kubebuilder-reviewers:
     - joelanford
     - estroz
-    - adirio
 
   # folks who may have context on ancient history,
   # but are no longer directly involved
   kubebuilder-emeritus-approvers:
-  - pwittrock
+    - pwittrock
