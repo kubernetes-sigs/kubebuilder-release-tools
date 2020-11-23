@@ -18,9 +18,13 @@ package verify
 
 import (
 	"fmt"
+	"regexp"
 
 	"sigs.k8s.io/kubebuilder-release-tools/notes/common"
 )
+
+// Extracted from kubernetes/test-infra/prow/plugins/wip/wip-label.go
+var wipRegex = regexp.MustCompile(`(?i)^\W?WIP\W`)
 
 type prTitleError struct {
 	title string
@@ -47,6 +51,9 @@ More details can be found at [sigs.k8s.io/controller-runtime/VERSIONING.md](http
 // returning a message describing what was found on success, and a special
 // error (with more detailed help via .Help) on failure.
 func VerifyPRTitle(title string) (string, error) {
+	// Remove the WIP prefix if found
+	title = wipRegex.ReplaceAllString(title, "")
+
 	prType, finalTitle := common.PRTypeFromTitle(title)
 	if prType == common.UncategorizedPR {
 		return "", &prTitleError{title: title}
