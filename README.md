@@ -46,9 +46,10 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-The code that actually runs lives in [verify/cmd](/verify/cmd), while
-[/verify](/verify) contains a framework for running PR description checks
-from GitHub actions & uploading the result via the GitHub checks API.
+The code that actually runs lives in [verify](/verify), while
+[/verify/pkg/action](/verify/pkg/action) contains a framework for running PR
+description checks from GitHub actions & uploading the result via the GitHub
+checks API.
 
 This repo itself uses a "live" version of the action that always rebuilds
 from the local code (master branch), which lives in 
