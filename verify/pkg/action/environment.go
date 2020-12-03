@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package verify
+package action
 
 import (
 	"context"
@@ -22,33 +22,35 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 
 	"github.com/google/go-github/v32/github"
 	"golang.org/x/oauth2"
-
-	"sigs.k8s.io/kubebuilder-release-tools/verify/pkg/log"
 )
 
-var l = log.New()
+const (
+	envActionsKey    = "GITHUB_ACTIONS"
+	envRepositoryKey = "GITHUB_REPOSITORY"
+	envEventPathKey  = "GITHUB_EVENT_PATH"
+	envTokenKey      = "INPUT_GITHUB_TOKEN"
+)
 
-type ActionsEnv struct {
+type PREnv struct {
 	Owner  string
 	Repo   string
 	Event  *github.PullRequestEvent
 	Client *github.Client
 }
 
-func setupEnv() (*ActionsEnv, error) {
-	if os.Getenv("GITHUB_ACTIONS") != "true" {
+func newPREnv() (*PREnv, error) {
+	if os.Getenv(envActionsKey) != "true" {
 		return nil, fmt.Errorf("not running in an action, bailing.  Set GITHUB_ACTIONS and the other appropriate env vars if you really want to do this.")
 	}
 
 	// Get owner and repository
-	ownerAndRepo := strings.Split(os.Getenv("GITHUB_REPOSITORY"), "/")
+	ownerAndRepo := strings.Split(os.Getenv(envRepositoryKey), "/")
 
 	// Get event path
-	eventPath := os.Getenv("GITHUB_EVENT_PATH")
+	eventPath := os.Getenv(envEventPathKey)
 	if eventPath == "" {
 		return nil, fmt.Errorf("no event path set, something weird is up")
 	}
@@ -59,7 +61,10 @@ func setupEnv() (*ActionsEnv, error) {
 		if err != nil {
 			return github.PullRequestEvent{}, fmt.Errorf("unable to load event file: %w", err)
 		}
-		defer eventFile.Close()
+		defer func() {
+			// As we are not writing to the file, we can omit the error
+			_ = eventFile.Close()
+		}()
 
 		var event github.PullRequestEvent
 		if err := json.NewDecoder(eventFile).Decode(&event); err != nil {
@@ -73,67 +78,13 @@ func setupEnv() (*ActionsEnv, error) {
 
 	// Create the client
 	client := github.NewClient(oauth2.NewClient(context.Background(), oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: os.Getenv("INPUT_GITHUB_TOKEN")},
+		&oauth2.Token{AccessToken: os.Getenv(envTokenKey)},
 	)))
 
-	return &ActionsEnv{
+	return &PREnv{
 		Owner:  ownerAndRepo[0],
 		Repo:   ownerAndRepo[1],
 		Event:  &event,
 		Client: client,
 	}, nil
-}
-
-type ActionsCallback func(*ActionsEnv) error
-
-func ActionsEntrypoint(cb ActionsCallback) {
-	env, err := setupEnv()
-	if err != nil {
-		l.Fatalf(1, "%v", err)
-	}
-	l.Debugf("environment for %s/%s ready", env.Owner, env.Repo)
-
-	if err := cb(env); err != nil {
-		l.Fatalf(2, "%v", err)
-	}
-	l.Info("Success!")
-}
-
-func RunPlugins(plugins ...PRPlugin) ActionsCallback {
-	l.Debugf("creating cb for %d plugins", len(plugins))
-	return func(env *ActionsEnv) error {
-		res := make(chan error)
-		var done sync.WaitGroup
-
-		for _, plugin := range plugins {
-			l.Debugf("launching %q plugin", plugin.Name)
-			done.Add(1)
-			go func(plugin PRPlugin) {
-				defer done.Done()
-				plugin.init()
-				res <- plugin.entrypoint(env)
-			}(plugin)
-		}
-
-		go func() {
-			done.Wait()
-			close(res)
-		}()
-
-		l.Debug("retrieving plugin results")
-		errCount := 0
-		for err := range res {
-			if err == nil {
-				continue
-			}
-			errCount++
-			l.Errorf("%v", err)
-		}
-
-		l.Infof("%d plugins ran", len(plugins))
-		if errCount > 0 {
-			return fmt.Errorf("%d plugins had errors", errCount)
-		}
-		return nil
-	}
 }

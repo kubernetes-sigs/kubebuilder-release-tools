@@ -6,7 +6,7 @@ COPY notes notes
 WORKDIR /go/src/verify/verify
 
 ENV CGO_ENABLED=0
-RUN go build -o /go/bin/verifypr ./cmd/
+RUN go build -o /go/bin/verifypr ./
 
 FROM gcr.io/distroless/static-debian10
 
