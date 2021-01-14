@@ -30,7 +30,7 @@ import (
 	"strings"
 
 	"sigs.k8s.io/kubebuilder-release-tools/notes/compose"
-	"sigs.k8s.io/kubebuilder-release-tools/notes/git"
+	"sigs.k8s.io/kubebuilder-release-tools/notes/pkg/git"
 )
 
 var (
@@ -49,11 +49,11 @@ var (
 // detailed stderr on exec errors
 func run() error {
 	if *fromTag == "" {
-		var err error
-		*branchName, err = git.Actual.CurrentBranch()
+		currentBranch, err := git.Utils.CurrentBranch()
 		if err != nil {
 			return err
 		}
+		*branchName = currentBranch.Committish()
 	}
 	log.Printf("starting from branch %q", *branchName)
 
@@ -65,7 +65,7 @@ func run() error {
 	if *useUpstreams {
 		branch.UseUpstream = true
 		if *refreshUpstreams {
-			if err := refreshUpstream(*branchName); err != nil {
+			if err := git.Utils.RefreshUpstream(git.LocalBranch(*branchName)); err != nil {
 				// this might happen if we're on a new branch, so don't fret
 				fmt.Fprintf(os.Stderr, "\x1b[1;31munable to refresh upstream, continuing on without it -- you may want to do this manually\x1b[0m: %v\n", err)
 			}
@@ -77,10 +77,10 @@ func run() error {
 		since   git.Committish
 	)
 	if *fromTag == "" {
-		changes, since, err = compose.Changes(git.Actual, &branch)
+		changes, since, err = compose.Changes(git.Utils, &branch)
 	} else {
 		since = git.SomeCommittish(*fromTag)
-		changes, err = compose.ChangesSince(git.Actual, branch, since)
+		changes, err = compose.ChangesSince(git.Utils, branch, since)
 	}
 	if err != nil {
 		return err
@@ -218,12 +218,12 @@ func printLog(branch compose.ReleaseBranch, recentChanges logChunk) error {
 	var otherChanges *logChunk
 	if *extraInfoOnFinal && compose.IsPreReleaseToFinal(recentChanges.since, rel.next) {
 		// the cast is guaranteed by IsPreReleaseFinal
-		prev, err := compose.ClosestFinal(git.Actual, recentChanges.since.(compose.ReleaseTag))
+		prev, err := compose.ClosestFinal(git.Utils, recentChanges.since.(compose.ReleaseTag))
 		if err != nil {
 			return fmt.Errorf("unable to find last final release (try running with --print-full-final=false if that's expected): %w", err)
 		}
 
-		otherLog, err := compose.ChangesSince(git.Actual, branch, *prev)
+		otherLog, err := compose.ChangesSince(git.Utils, branch, *prev)
 		if err != nil {
 			return fmt.Errorf("unable to compute changes since last final release (try running with --print-full-final=false if that's expected): %w", err)
 		}
@@ -277,17 +277,17 @@ func findProject(branchName string) (string, error) {
 	remote := "upstream"
 	if branchName != "" {
 		var err error
-		remote, err = git.Actual.RemoteForUpstreamFor(branchName)
+		remote, err = git.Utils.RemoteFor(git.LocalBranch(branchName))
 		if err != nil {
-			return "", fmt.Errorf("unable to determine upstream of branch %q: %w", branchName, err)
+			return "", err
 		}
 		log.Printf("remote for branch %q was %q", branchName, remote)
 	}
 
 	log.Printf("checking upstream URL for remote %q", remote)
-	upstreamURL, err := git.Actual.URLForRemote(remote)
+	upstreamURL, err := git.Utils.URLForRemote(remote)
 	if err != nil {
-		return "", fmt.Errorf("unable to determine upstream URL for %q: %w", remote, err)
+		return "", err
 	}
 
 	project := upstreamURL
@@ -300,15 +300,4 @@ func findProject(branchName string) (string, error) {
 
 	project = strings.TrimSuffix(project, ".git")
 	return project, nil
-}
-
-func refreshUpstream(branchName string) error {
-	remote, err := git.Actual.RemoteForUpstreamFor(branchName)
-	if err != nil {
-		fmt.Errorf("unable to determine upstream of branch %q: %w", branchName, err)
-	}
-	if err := git.Actual.Fetch(remote); err != nil {
-		return fmt.Errorf("unable to refresh remote %q: %w", remote, err)
-	}
-	return nil
 }

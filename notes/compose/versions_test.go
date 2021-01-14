@@ -24,14 +24,14 @@ import (
 	. "github.com/onsi/gomega"
 
 	. "sigs.k8s.io/kubebuilder-release-tools/notes/compose"
-	"sigs.k8s.io/kubebuilder-release-tools/notes/git"
+	"sigs.k8s.io/kubebuilder-release-tools/notes/pkg/git"
 )
 
 var _ = Describe("Versions", func() {
 	Describe("finding the current one", func() {
 		It("should return the latest release on this branch if it matches the branch version", func() {
-			gitImpl := gitFuncs{
-				closestTag: func(initial git.Committish) (git.Tag, error) {
+			gitImpl := git.UtilitiesMock{
+				ClosestTagF: func(git.Committish) (git.Tag, error) {
 					return git.Tag("v0.6.3"), nil
 				},
 			}
@@ -43,11 +43,11 @@ var _ = Describe("Versions", func() {
 		})
 
 		It("should return the first commit on this branch if no release exists", func() {
-			gitImpl := gitFuncs{
-				closestTag: func(initial git.Committish) (git.Tag, error) {
+			gitImpl := git.UtilitiesMock{
+				ClosestTagF: func(git.Committish) (git.Tag, error) {
 					return git.Tag(""), fmt.Errorf("no tag found!")
 				},
-				firstCommit: func(branchName string) (git.Commit, error) {
+				RootCommitF: func(git.Ref) (git.Commit, error) {
 					return git.Commit("abcdef"), nil
 				},
 			}
@@ -61,18 +61,18 @@ var _ = Describe("Versions", func() {
 
 		Context("when figuring out if upstreams should be used", func() {
 			It("should clear the upstream on the current branch if no upstream exists", func() {
-				gitImpl := gitFuncs{
-					closestTag: func(initial git.Committish) (git.Tag, error) {
+				gitImpl := git.UtilitiesMock{
+					ClosestTagF: func(initial git.Committish) (git.Tag, error) {
 						if initial.Committish() != "release-0.6" {
 							return git.Tag(""), fmt.Errorf("supplied branch that was probably an upstream: %v", initial)
 						}
 						return git.Tag("v0.6.3"), nil
 					},
-					hasUpstream: func(branchName string) error {
-						if branchName == "release-0.6@{u}" {
-							return fmt.Errorf("no upstream for this branch")
+					HasUpstreamF: func(branch git.LocalBranch) bool {
+						if branch.Committish() == "release-0.6@{u}" {
+							return false
 						}
-						return nil
+						return true
 					},
 				}
 
@@ -83,18 +83,18 @@ var _ = Describe("Versions", func() {
 			})
 
 			It("should keep the upstream around if one does exist", func() {
-				gitImpl := gitFuncs{
-					closestTag: func(initial git.Committish) (git.Tag, error) {
+				gitImpl := git.UtilitiesMock{
+					ClosestTagF: func(initial git.Committish) (git.Tag, error) {
 						if initial.Committish() != "release-0.6@{u}" {
 							return git.Tag(""), fmt.Errorf("supplied branch that was not an upstream: %v", initial)
 						}
 						return git.Tag("v0.6.3"), nil
 					},
-					hasUpstream: func(branchName string) error {
-						if branchName == "release-0.6@{u}" {
-							return nil
+					HasUpstreamF: func(branch git.LocalBranch) bool {
+						if branch.Committish() == "release-0.6@{u}" {
+							return false
 						}
-						return fmt.Errorf("no upstream for this branch")
+						return true
 					},
 				}
 
@@ -105,8 +105,8 @@ var _ = Describe("Versions", func() {
 			})
 
 			It("should keep using upstreams when looking back a branch, even if the current one lacked one, if we originally asked to", func() {
-				gitImpl := gitFuncs{
-					closestTag: func(initial git.Committish) (git.Tag, error) {
+				gitImpl := git.UtilitiesMock{
+					ClosestTagF: func(initial git.Committish) (git.Tag, error) {
 						switch initial.Committish() {
 						case "release-0.6":
 							return git.Tag("v0.5.0"), nil
@@ -116,11 +116,11 @@ var _ = Describe("Versions", func() {
 							panic("unexpected branch requested")
 						}
 					},
-					hasUpstream: func(branchName string) error {
-						if branchName == "release-0.6@{u}" {
-							return fmt.Errorf("no upstream for this branch")
+					HasUpstreamF: func(branch git.LocalBranch) bool {
+						if branch.Committish() == "release-0.6@{u}" {
+							return false
 						}
-						return nil
+						return true
 					},
 				}
 
@@ -134,8 +134,8 @@ var _ = Describe("Versions", func() {
 
 		Context("when the latest release belongs to the previous release", func() {
 			It("should return the latest release on that release-0.(Y-1) branch", func() {
-				gitImpl := gitFuncs{
-					closestTag: func(initial git.Committish) (git.Tag, error) {
+				gitImpl := git.UtilitiesMock{
+					ClosestTagF: func(initial git.Committish) (git.Tag, error) {
 						switch initial.Committish() {
 						case "release-0.7":
 							return git.Tag("v0.6.0"), nil
@@ -153,8 +153,8 @@ var _ = Describe("Versions", func() {
 				)))
 			})
 			It("should return the latest release on that release-(X-1) branch", func() {
-				gitImpl := gitFuncs{
-					closestTag: func(initial git.Committish) (git.Tag, error) {
+				gitImpl := git.UtilitiesMock{
+					ClosestTagF: func(initial git.Committish) (git.Tag, error) {
 						switch initial.Committish() {
 						case "release-2":
 							return git.Tag("v1.0.0"), nil
@@ -172,8 +172,8 @@ var _ = Describe("Versions", func() {
 				)))
 			})
 			It("should return the latest release on that release-0.Y branch if this is a release-1 branch", func() {
-				gitImpl := gitFuncs{
-					closestTag: func(initial git.Committish) (git.Tag, error) {
+				gitImpl := git.UtilitiesMock{
+					ClosestTagF: func(initial git.Committish) (git.Tag, error) {
 						switch initial.Committish() {
 						case "release-1":
 							return git.Tag("v0.6.0"), nil
@@ -192,8 +192,8 @@ var _ = Describe("Versions", func() {
 			})
 
 			It("should fail if the previous branch has a release that doesn't belong to it", func() {
-				gitImpl := gitFuncs{
-					closestTag: func(initial git.Committish) (git.Tag, error) {
+				gitImpl := git.UtilitiesMock{
+					ClosestTagF: func(initial git.Committish) (git.Tag, error) {
 						switch initial.Committish() {
 						case "release-1":
 							return git.Tag("v0.6.0"), nil
@@ -212,8 +212,8 @@ var _ = Describe("Versions", func() {
 		})
 
 		It("should fail if the latest release doesn't belong to the current or previous release branch", func() {
-			gitImpl := gitFuncs{
-				closestTag: func(initial git.Committish) (git.Tag, error) {
+			gitImpl := git.UtilitiesMock{
+				ClosestTagF: func(initial git.Committish) (git.Tag, error) {
 					return git.Tag("v0.6.0"), nil
 				},
 			}

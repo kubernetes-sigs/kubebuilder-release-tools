@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	. "sigs.k8s.io/kubebuilder-release-tools/notes/compose"
-	"sigs.k8s.io/kubebuilder-release-tools/notes/git"
+	"sigs.k8s.io/kubebuilder-release-tools/notes/pkg/git"
 )
 
 var (
@@ -45,11 +45,11 @@ Merge pull request #1137 from vincepri/update-jsonpatch490-06
 
 var _ = Describe("Change Logs", func() {
 	It("should be able to just figure out the latest version if we don't ask for a specific one", func() {
-		gitImpl := gitFuncs{
-			closestTag: func(initial git.Committish) (git.Tag, error) {
+		gitImpl := git.UtilitiesMock{
+			ClosestTagF: func(git.Committish) (git.Tag, error) {
 				return git.Tag("v0.6.3"), nil
 			},
-			mergeCommitsBetween: func(start, end git.Committish) (string, error) {
+			MergeCommitsBetweenF: func(start, end git.Committish) (string, error) {
 				if start.Committish() != "v0.6.3" || end.Committish() != "release-0.6" {
 					return "", fmt.Errorf("couldn't find commits for unexpected range %s..%s", start.Committish(), end.Committish())
 				}
@@ -65,8 +65,8 @@ var _ = Describe("Change Logs", func() {
 	})
 
 	It("should use the specified start point when we specify one", func() {
-		gitImpl := gitFuncs{
-			mergeCommitsBetween: func(start, end git.Committish) (string, error) {
+		gitImpl := git.UtilitiesMock{
+			MergeCommitsBetweenF: func(start, end git.Committish) (string, error) {
 				if start.Committish() != "abcdef" || end.Committish() != "release-0.6" {
 					return "", fmt.Errorf("couldn't find commits for unexpected range %s..%s", start.Committish(), end.Committish())
 				}
@@ -81,8 +81,8 @@ var _ = Describe("Change Logs", func() {
 	})
 
 	It("should fail if we can't get the merge commits", func() {
-		gitImpl := gitFuncs{
-			mergeCommitsBetween: func(start, end git.Committish) (string, error) {
+		gitImpl := git.UtilitiesMock{
+			MergeCommitsBetweenF: func(git.Committish, git.Committish) (string, error) {
 				// note for non-native speakers: "accidentally the X" is a meme-y colloquialism
 				return "", fmt.Errorf("couldn't find the commits -- did you accidentally the repository?")
 			},
@@ -94,8 +94,8 @@ var _ = Describe("Change Logs", func() {
 	})
 
 	It("should turn merge commits into changelog entries", func() {
-		gitImpl := gitFuncs{
-			mergeCommitsBetween: func(start, end git.Committish) (string, error) {
+		gitImpl := git.UtilitiesMock{
+			MergeCommitsBetweenF: func(git.Committish, git.Committish) (string, error) {
 				return (
 				// a decent sampling of different commits -- at least
 				// one of each type, but not necessarily one of each indicator.
@@ -193,8 +193,8 @@ Merge pull request #1129 from Shpectator/admission-webhooks-status-response
 
 	It("should skip non-GitHub merge commits", func() {
 
-		gitImpl := gitFuncs{
-			mergeCommitsBetween: func(start, end git.Committish) (string, error) {
+		gitImpl := git.UtilitiesMock{
+			MergeCommitsBetweenF: func(git.Committish, git.Committish) (string, error) {
 				return (
 				// a few valid commits mixed with some (real) bad merges from CR
 				`commit 06787b6b0e735e5a56fdfbcd8129effaefec3146

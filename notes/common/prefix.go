@@ -22,6 +22,7 @@ import (
 )
 
 type PRType int
+
 func (t PRType) Emoji() string {
 	switch t {
 	case UncategorizedPR:

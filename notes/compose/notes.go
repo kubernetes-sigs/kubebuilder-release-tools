@@ -26,7 +26,7 @@ import (
 	"github.com/blang/semver/v4"
 
 	"sigs.k8s.io/kubebuilder-release-tools/notes/common"
-	"sigs.k8s.io/kubebuilder-release-tools/notes/git"
+	"sigs.k8s.io/kubebuilder-release-tools/notes/pkg/git"
 )
 
 var (
@@ -145,12 +145,12 @@ func parseReleaseTag(tagRaw git.Tag) (*ReleaseTag, error) {
 
 // LatestRelease returns the most recent ReleaseTag on this branch, or a the
 // FirstCommit if none existed.
-func (b ReleaseBranch) LatestRelease(gitImpl git.Git, checkVersion bool) (git.Committish, error) {
+func (b ReleaseBranch) LatestRelease(gitImpl git.Utilities, checkVersion bool) (git.Committish, error) {
 	tagRaw, err := gitImpl.ClosestTag(b)
 	if err != nil {
 		golog.Printf("unable to get latest tag starting at %q, assuming we need to look for the first commit instead (%v)", b, err)
 		// try to get the first commit
-		commitSHA, commitErr := gitImpl.FirstCommit(b.String())
+		commitSHA, commitErr := gitImpl.RootCommit(git.Branch(b.String()))
 		if commitErr != nil {
 			// double wrap to get both errors
 			return nil, fmt.Errorf("unable to grab first commit on branch %q (%v), also unable to fetch most recent tag: %w", b, err, commitErr)
@@ -188,13 +188,13 @@ func (b ReleaseBranch) VerifyTagBelongs(tag ReleaseTag) error {
 // checkOrClearUpstream verifies that the upstream exists for this branch and
 // clears UseUpstream if it does not.  If UseUpstream is already false, this is
 // a no-op.
-func checkOrClearUpstream(gitImpl git.Git, branch *ReleaseBranch) {
+func checkOrClearUpstream(gitImpl git.Utilities, branch *ReleaseBranch) {
 	if !branch.UseUpstream {
 		return
 	}
-	if err := gitImpl.HasUpstream(branch.String()); err != nil {
+	if !gitImpl.HasUpstream(git.LocalBranch(branch.Committish())) {
 		branch.UseUpstream = false
-		golog.Printf("branch %q did not have an upstream, falling back to non-upstream (%v)", branch, err)
+		golog.Printf("branch %q did not have an upstream, falling back to non-upstream", branch)
 	}
 }
 
@@ -208,7 +208,7 @@ func checkOrClearUpstream(gitImpl git.Git, branch *ReleaseBranch) {
 // For instance, on a fresh `release-0.7` branch, the "latest" release might be `v0.6.0`
 // (since the `v0.Y.0` releases are always off of the main branch), so it'll check `release-0.6`
 // to find that the *actual* latest release is `v0.6.3`.
-func CurrentVersion(gitImpl git.Git, branch *ReleaseBranch) (git.Committish, error) {
+func CurrentVersion(gitImpl git.Utilities, branch *ReleaseBranch) (git.Committish, error) {
 	origUseUpstream := branch.UseUpstream // keep this around to keep trying later if necessary
 	checkOrClearUpstream(gitImpl, branch)
 
@@ -429,7 +429,7 @@ func (c ChangeLog) nextFinalVersion(current ReleaseTag, pre10 bool) ReleaseTag {
 
 // Changes computes the changelog from last release TO HEAD, returning both the
 // changelog and the last release used.
-func Changes(gitImpl git.Git, branch *ReleaseBranch) (log ChangeLog, since git.Committish, err error) {
+func Changes(gitImpl git.Utilities, branch *ReleaseBranch) (log ChangeLog, since git.Committish, err error) {
 	since, err = CurrentVersion(gitImpl, branch)
 	if err != nil {
 		return ChangeLog{}, nil, err
@@ -440,7 +440,7 @@ func Changes(gitImpl git.Git, branch *ReleaseBranch) (log ChangeLog, since git.C
 }
 
 // ChangesSince computes the changelog from the given point to HEAD.
-func ChangesSince(gitImpl git.Git, branch ReleaseBranch, since git.Committish) (ChangeLog, error) {
+func ChangesSince(gitImpl git.Utilities, branch ReleaseBranch, since git.Committish) (ChangeLog, error) {
 	golog.Printf("finding changes since %q", since.Committish())
 
 	commitsRaw, err := gitImpl.MergeCommitsBetween(since, branch)
@@ -548,7 +548,7 @@ func IsPreReleaseToFinal(current git.Committish, next ReleaseTag) bool {
 
 // ClosestFinal finds the "closest" previous final release.  For example, given
 // `v0.7.0-rc.3`, the closest final release might be `v0.6.3`.
-func ClosestFinal(gitImpl git.Git, current ReleaseTag) (*ReleaseTag, error) {
+func ClosestFinal(gitImpl git.Utilities, current ReleaseTag) (*ReleaseTag, error) {
 	currentFinal := semver.Version(current)
 	currentFinal.Pre = nil
 
