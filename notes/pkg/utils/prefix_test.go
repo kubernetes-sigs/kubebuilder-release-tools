@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common_test
+package utils_test
 
 import (
 	"testing"
@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 
-	. "sigs.k8s.io/kubebuilder-release-tools/notes/common"
+	. "sigs.k8s.io/kubebuilder-release-tools/notes/pkg/utils"
 )
 
 func TestCommon(t *testing.T) {

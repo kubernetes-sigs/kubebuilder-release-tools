@@ -25,8 +25,8 @@ import (
 
 	"github.com/blang/semver/v4"
 
-	"sigs.k8s.io/kubebuilder-release-tools/notes/common"
 	"sigs.k8s.io/kubebuilder-release-tools/notes/pkg/git"
+	"sigs.k8s.io/kubebuilder-release-tools/notes/pkg/utils"
 )
 
 var (
@@ -282,20 +282,20 @@ type ChangeLog struct {
 func (l *ChangeLog) entryFromCommit(prNum, title string) {
 	entry := LogEntry{PRNumber: prNum}
 
-	prType, title := common.PRTypeFromTitle(title)
+	prType, title := utils.PRTypeFromTitle(title)
 	entry.Title = title
 	switch prType {
-	case common.FeaturePR:
+	case utils.FeaturePR:
 		l.Features = append(l.Features, entry)
-	case common.BugfixPR:
+	case utils.BugfixPR:
 		l.Bugs = append(l.Bugs, entry)
-	case common.DocsPR:
+	case utils.DocsPR:
 		l.Docs = append(l.Docs, entry)
-	case common.InfraPR:
+	case utils.InfraPR:
 		l.Infra = append(l.Infra, entry)
-	case common.BreakingPR:
+	case utils.BreakingPR:
 		l.Breaking = append(l.Breaking, entry)
-	case common.UncategorizedPR:
+	case utils.UncategorizedPR:
 		l.Uncategorized = append(l.Uncategorized, entry)
 	default:
 		panic(fmt.Sprintf("unrecognized internal PR type %v", prType))

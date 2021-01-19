@@ -99,7 +99,7 @@ var _ = Describe("Change Logs", func() {
 				return (
 				// a decent sampling of different commits -- at least
 				// one of each type, but not necessarily one of each indicator.
-				// The full range of indicators is tested in common.
+				// The full range of indicators is tested in utils.
 				`commit 6af4e7c71d4ca149837d2ed9a33fd8df98ac6103
 Merge pull request #1187 from vincepri/go115
 
