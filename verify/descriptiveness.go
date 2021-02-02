@@ -17,10 +17,14 @@ limitations under the License.
 package main
 
 import (
+	"strings"
+
 	"github.com/google/go-github/v32/github"
 
 	"sigs.k8s.io/kubebuilder-release-tools/verify/pkg/action"
 )
+
+const skipDescriptivenessCheckLabel = "skip-descriptiveness-check"
 
 type prDescriptivenessError struct{}
 
@@ -36,7 +40,13 @@ Someone reading the PR description without clicking any issue links should be ab
 // checkPRDescriptiveness
 func checkPRDescriptiveness(requiredCharacters int) action.ValidateFunc {
 	return func(pr *github.PullRequest) (string, string, error) {
-		if len(pr.GetBody()) < requiredCharacters {
+		for _, label := range pr.Labels {
+			if label.Name != nil && *label.Name == skipDescriptivenessCheckLabel {
+				return "Skipping descriptiveness check!", "", nil
+			}
+		}
+
+		if len(strings.TrimSpace(pr.GetBody())) < requiredCharacters {
 			return "", "", &prDescriptivenessError{}
 		}
 		return "Your PR looks descriptive enough!", "", nil
