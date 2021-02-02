@@ -24,6 +24,8 @@ import (
 	"sigs.k8s.io/kubebuilder-release-tools/verify/pkg/action"
 )
 
+const skipDescriptivenessCheckLabel = "skip-descriptiveness-check"
+
 type prDescriptivenessError struct{}
 
 func (e prDescriptivenessError) Error() string {
@@ -36,16 +38,15 @@ Someone reading the PR description without clicking any issue links should be ab
 }
 
 // checkPRDescriptiveness
-func checkPRDescriptiveness(requiredLines int) action.ValidateFunc {
+func checkPRDescriptiveness(requiredCharacters int) action.ValidateFunc {
 	return func(pr *github.PullRequest) (string, string, error) {
-		lineCnt := 0
-		for _, line := range strings.Split(pr.GetBody(), "\n") {
-			if strings.TrimSpace(line) == "" {
-				continue
+		for _, label := range pr.Labels {
+			if label.Name != nil && *label.Name == skipDescriptivenessCheckLabel {
+				return "Skipping descriptiveness check!", "", nil
 			}
-			lineCnt++
 		}
-		if lineCnt < requiredLines {
+
+		if len(strings.TrimSpace(pr.GetBody())) < requiredCharacters {
 			return "", "", &prDescriptivenessError{}
 		}
 		return "Your PR looks descriptive enough!", "", nil
