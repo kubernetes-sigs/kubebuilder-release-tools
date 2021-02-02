@@ -24,15 +24,15 @@ import (
 	. "github.com/onsi/gomega"
 
 	. "sigs.k8s.io/kubebuilder-release-tools/notes/compose"
-	"sigs.k8s.io/kubebuilder-release-tools/notes/git"
+	"sigs.k8s.io/kubebuilder-release-tools/notes/pkg/git"
 )
 
 var _ = Describe("Branches", func() {
 	Describe("finding the latest release", func() {
 		branch := ReleaseBranch{Version: semver.Version{Major: 1}}
 		It("should return ReleaseTag if there was a release in this branch's history", func() {
-			gitImpl := gitFuncs{
-				closestTag: func(initial git.Committish) (git.Tag, error) {
+			gitImpl := git.UtilitiesMock{
+				ClosestTagF: func(git.Committish) (git.Tag, error) {
 					return git.Tag("v1.3.4"), nil
 				},
 			}
@@ -43,8 +43,8 @@ var _ = Describe("Branches", func() {
 		})
 
 		It("should support pre-release ReleaseTags", func() {
-			gitImpl := gitFuncs{
-				closestTag: func(initial git.Committish) (git.Tag, error) {
+			gitImpl := git.UtilitiesMock{
+				ClosestTagF: func(git.Committish) (git.Tag, error) {
 					return git.Tag("v1.3.4-alpha.6"), nil
 				},
 			}
@@ -57,12 +57,12 @@ var _ = Describe("Branches", func() {
 			)))
 		})
 
-		It("should return FirstCommit if no release exists yet", func() {
-			gitImpl := gitFuncs{
-				closestTag: func(initial git.Committish) (git.Tag, error) {
+		It("should return RootCommit if no release exists yet", func() {
+			gitImpl := git.UtilitiesMock{
+				ClosestTagF: func(git.Committish) (git.Tag, error) {
 					return git.Tag(""), fmt.Errorf("no tag found!")
 				},
-				firstCommit: func(branchName string) (git.Commit, error) {
+				RootCommitF: func(git.Ref) (git.Commit, error) {
 					return git.Commit("abcdef"), nil
 				},
 			}
@@ -73,11 +73,11 @@ var _ = Describe("Branches", func() {
 		})
 
 		It("should fail if no release exists and the first commit cannot be found", func() {
-			gitImpl := gitFuncs{
-				closestTag: func(initial git.Committish) (git.Tag, error) {
+			gitImpl := git.UtilitiesMock{
+				ClosestTagF: func(git.Committish) (git.Tag, error) {
 					return git.Tag(""), fmt.Errorf("no tag found!")
 				},
-				firstCommit: func(branchName string) (git.Commit, error) {
+				RootCommitF: func(git.Ref) (git.Commit, error) {
 					return git.Commit(""), fmt.Errorf("infinite parallel lines, non-euclidean git repository encountered!")
 				},
 			}
@@ -86,8 +86,8 @@ var _ = Describe("Branches", func() {
 		})
 
 		It("should reject tags from the wrong branch if asked to verify tags", func() {
-			gitImpl := gitFuncs{
-				closestTag: func(initial git.Committish) (git.Tag, error) {
+			gitImpl := git.UtilitiesMock{
+				ClosestTagF: func(git.Committish) (git.Tag, error) {
 					return git.Tag("v0.6.7"), nil
 				},
 			}
@@ -97,8 +97,8 @@ var _ = Describe("Branches", func() {
 		})
 
 		It("should accept tags from the wrong branch if not asked to verify tags", func() {
-			gitImpl := gitFuncs{
-				closestTag: func(initial git.Committish) (git.Tag, error) {
+			gitImpl := git.UtilitiesMock{
+				ClosestTagF: func(git.Committish) (git.Tag, error) {
 					return git.Tag("v0.6.7"), nil
 				},
 			}

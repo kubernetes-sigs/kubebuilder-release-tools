@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package utils
 
 import (
 	"fmt"
@@ -22,6 +22,7 @@ import (
 )
 
 type PRType int
+
 func (t PRType) Emoji() string {
 	switch t {
 	case UncategorizedPR:

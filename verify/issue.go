@@ -22,7 +22,7 @@ import (
 
 	"github.com/google/go-github/v32/github"
 
-	notes "sigs.k8s.io/kubebuilder-release-tools/notes/common"
+	notes "sigs.k8s.io/kubebuilder-release-tools/notes/pkg/utils"
 )
 
 var tagRegexp = regexp.MustCompile(`#\d+\b`)
