@@ -98,8 +98,18 @@ func (p plugin) onOpen(env *PREnv) error {
 // onReopen handles "reopened" actions
 func (p plugin) onReopen(env *PREnv) error {
 	p.Debugf("%q handler", actionReopen)
-	// Get the check run
+	// Get the old check run
 	checkRun, err := p.getCheckRun(env.Client, env.Owner, env.Repo, env.Event.GetPullRequest().GetHead().GetSHA())
+	if err != nil {
+		return err
+	}
+
+	// Create the check run if there was none or duplicate if there was
+	if checkRun == nil {
+		checkRun, err = p.createCheckRun(env.Client, env.Owner, env.Repo, env.Event.GetPullRequest().GetHead().GetSHA())
+	} else {
+		checkRun, err = p.duplicateCheckRun(env.Client, env.Owner, env.Repo, env.Event.GetPullRequest().GetHead().GetSHA(), checkRun)
+	}
 	if err != nil {
 		return err
 	}
@@ -122,10 +132,31 @@ func (p plugin) onReopen(env *PREnv) error {
 // onEdit handles "edited" actions
 func (p plugin) onEdit(env *PREnv) error {
 	p.Debugf("%q handler", actionEdit)
-	// Reset the check run
-	checkRun, err := p.resetCheckRun(env.Client, env.Owner, env.Repo, env.Event.GetPullRequest().GetHead().GetSHA())
+	// Get the old check run
+	checkRun, err := p.getCheckRun(env.Client, env.Owner, env.Repo, env.Event.GetPullRequest().GetHead().GetSHA())
 	if err != nil {
 		return err
+	}
+
+	// Create the check run if there was none or duplicate if there was
+	if checkRun == nil {
+		checkRun, err = p.createCheckRun(
+			env.Client, env.Owner, env.Repo, env.Event.GetPullRequest().GetHead().GetSHA())
+	} else {
+		checkRun, err = p.duplicateCheckRun(
+			env.Client, env.Owner, env.Repo, env.Event.GetPullRequest().GetHead().GetSHA(), checkRun)
+	}
+	if err != nil {
+		return  err
+	}
+
+	// If it was created but not finished, we don't need to update it
+	if !Started.Equal(checkRun.GetStatus()) {
+		// Reset the check run
+		checkRun, err = p.resetCheckRun(env.Client, env.Owner, env.Repo, checkRun.GetID())
+		if err != nil {
+			return err
+		}
 	}
 
 	// Process the PR and submit the results
@@ -136,8 +167,18 @@ func (p plugin) onEdit(env *PREnv) error {
 // onSync handles "synchronize" actions
 func (p plugin) onSync(env *PREnv) error {
 	p.Debugf("%q handler", actionSync)
-	// Get the check run
+	// Get the old check run
 	checkRun, err := p.getCheckRun(env.Client, env.Owner, env.Repo, env.Event.GetBefore())
+	if err != nil {
+		return err
+	}
+
+	// Create the check run if there was none or duplicate if there was
+	if checkRun == nil {
+		checkRun, err = p.createCheckRun(env.Client, env.Owner, env.Repo, env.Event.GetBefore())
+	} else {
+		checkRun, err = p.duplicateCheckRun(env.Client, env.Owner, env.Repo, env.Event.GetBefore(), checkRun)
+	}
 	if err != nil {
 		return err
 	}
@@ -145,15 +186,7 @@ func (p plugin) onSync(env *PREnv) error {
 	// Rerun the tests if they weren't finished
 	if !Finished.Equal(checkRun.GetStatus()) {
 		// Process the PR and submit the results
-		checkRun, err = p.validateAndSubmit(env, checkRun)
-		if err != nil {
-			return err
-		}
-	}
-
-	// Create a duplicate for the new commit
-	checkRun, err = p.duplicateCheckRun(env.Client, env.Owner, env.Repo, env.Event.GetAfter(), checkRun)
-	if err != nil {
+		_, err = p.validateAndSubmit(env, checkRun)
 		return err
 	}
 
@@ -237,8 +270,8 @@ func (p plugin) createCheckRun(client *github.Client, owner, repo, headSHA strin
 	return checkRun, nil
 }
 
-// getCheckRun returns the Check-Run, creating it if it doesn't exist.
-// It returns an error in case it didn't exist and couldn't be created, or if there are multiple matches.
+// getCheckRun returns the Check-Run.
+// It returns an error in case check runs couldn't be listed or there are multiple matches.
 func (p plugin) getCheckRun(client *github.Client, owner, repo, headSHA string) (*github.CheckRun, error) {
 	p.Debugf("getting check run %q on %s/%s @ %s...", p.checkRunName, owner, repo, headSHA)
 
@@ -249,6 +282,7 @@ func (p plugin) getCheckRun(client *github.Client, owner, repo, headSHA string) 
 		headSHA,
 		&github.ListCheckRunsOptions{
 			CheckName: github.String(p.checkRunName),
+			Filter:    github.String("latest"),
 		},
 	)
 
@@ -261,35 +295,28 @@ func (p plugin) getCheckRun(client *github.Client, owner, repo, headSHA string) 
 
 	switch n := *checkRunList.Total; {
 	case n == 0:
-		return p.createCheckRun(client, owner, repo, headSHA)
+		return nil, nil
 	case n == 1:
 		return checkRunList.CheckRuns[0], nil
-	case n > 1:
+	case n > 1: // Should never happen due to latest filter
 		return nil, fmt.Errorf("multiple instances of `%s` check run found on %s/%s @ %s",
 			p.checkRunName, owner, repo, headSHA)
-	default: // Should never happen
+	default: // Should never happen, something went really wrong if a negative amount of check runs is returned
 		return nil, fmt.Errorf("negative number of instances (%d) of `%s` check run found on %s/%s @ %s",
 			n, p.checkRunName, owner, repo, headSHA)
 	}
 }
 
-// resetCheckRun returns the Check-Run with executing status, creating it if it doesn't exist.
-// It returns an error in case it didn't exist and couldn't be created, if there are multiple matches,
-// or if it exists but couldn't be updated.
-func (p plugin) resetCheckRun(client *github.Client, owner, repo string, headSHA string) (*github.CheckRun, error) {
-	checkRun, err := p.getCheckRun(client, owner, repo, headSHA)
-	// If it errored, or it was created but not finished, we don't need to update it
-	if err != nil || Started.Equal(checkRun.GetStatus()) {
-		return checkRun, err
-	}
-
+// resetCheckRun returns the Check-Run with executing status.
+// It returns an error in case it couldn't be updated.
+func (p plugin) resetCheckRun(client *github.Client, owner, repo string, checkRunID int64) (*github.CheckRun, error) {
 	p.Debugf("resetting check run %q on %s/%s...", p.checkRunName, owner, repo)
 
 	checkRun, updateResp, err := client.Checks.UpdateCheckRun(
 		context.TODO(),
 		owner,
 		repo,
-		checkRun.GetID(),
+		checkRunID,
 		github.UpdateCheckRunOptions{
 			Name:   p.checkRunName,
 			Status: Started.StringP(),
@@ -315,16 +342,22 @@ func (p plugin) finishCheckRun(client *github.Client, owner, repo string, checkR
 	if text != "" {
 		testPointer = github.String(text)
 	}
-	checkRun, updateResp, err := client.Checks.UpdateCheckRun(context.TODO(), owner, repo, checkRunID, github.UpdateCheckRunOptions{
-		Name:        p.checkRunName,
-		Conclusion:  github.String(conclusion),
-		CompletedAt: &github.Timestamp{Time: time.Now()},
-		Output: &github.CheckRunOutput{
-			Title:   github.String(p.checkRunOutputTitle),
-			Summary: github.String(summary),
-			Text:    testPointer,
+	checkRun, updateResp, err := client.Checks.UpdateCheckRun(
+		context.TODO(),
+		owner,
+		repo,
+		checkRunID,
+		github.UpdateCheckRunOptions{
+			Name:        p.checkRunName,
+			Conclusion:  github.String(conclusion),
+			CompletedAt: &github.Timestamp{Time: time.Now()},
+			Output: &github.CheckRunOutput{
+				Title:   github.String(p.checkRunOutputTitle),
+				Summary: github.String(summary),
+				Text:    testPointer,
+			},
 		},
-	})
+	)
 
 	p.Debugf("update check API response: %+v", updateResp)
 	p.Debugf("updated run: %+v", checkRun)
@@ -335,7 +368,8 @@ func (p plugin) finishCheckRun(client *github.Client, owner, repo string, checkR
 	return checkRun, nil
 }
 
-// duplicateCheckRun creates a new Check-Run with the same info as the provided one but for a new headSHA
+// duplicateCheckRun creates a new Check-Run with the same info as the provided one but for a new headSHA.
+// It returns an error if it couldn't be created.
 func (p plugin) duplicateCheckRun(client *github.Client, owner, repo, headSHA string, checkRun *github.CheckRun) (*github.CheckRun, error) {
 	p.Debugf("duplicating check run %q on %s/%s @ %s...", p.checkRunName, owner, repo, headSHA)
 
