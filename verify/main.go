@@ -35,7 +35,7 @@ func main() {
 		action.NewPlugin(
 			"PR Desc",
 			"Basic PR Descriptiveness Check",
-			checkPRDescriptiveness(2),
+			checkPRDescriptiveness(80),
 		),
 	).Run()
 }
