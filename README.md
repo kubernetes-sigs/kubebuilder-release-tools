@@ -77,17 +77,6 @@ $ git push upstream refs/tags/vX
 [VERSIONING.md](/VERSIONING.md) contains the general guidelines for
 versioning, releasing, etc for the KubeBuilder projects.
 
-The TL;DR on PR titles is that you must have a *prefix* on your PR title
-specifying the kind of change:
-
-- Breaking change: :warning: (`:warning:`)
-- Non-breaking feature: :sparkles: (`:sparkles:`)
-- Patch fix: :bug: (`:bug:`)
-- Docs: :book: (`:book:`)
-- Infra/Tests/Other: :seedling: (`:seedling:`)
-
-See [the document](/VERSIONING.md) for more details.
-
 ## Community, discussion, contribution, and support
 
 Learn how to engage with the Kubernetes community on the [community page](http://kubernetes.io/community/).
