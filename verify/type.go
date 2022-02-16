@@ -19,6 +19,7 @@ package main
 import (
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/google/go-github/v32/github"
 
@@ -27,6 +28,8 @@ import (
 
 // Extracted from kubernetes/test-infra/prow/plugins/wip/wip-label.go
 var wipRegex = regexp.MustCompile(`(?i)^\W?WIP\W`)
+
+var tagRegex = regexp.MustCompile(`^\[[\w-\.]*\]`)
 
 type prTitleTypeError struct {
 	title string
@@ -53,8 +56,7 @@ More details can be found at [sigs.k8s.io/kubebuilder-release-tools/VERSIONING.m
 
 // verifyPRType checks that the PR title contains a prefix that defines its type
 func verifyPRType(pr *github.PullRequest) (string, string, error) {
-	// Remove the WIP prefix if found
-	title := wipRegex.ReplaceAllString(pr.GetTitle(), "")
+	title := trimTitle(pr.GetTitle())
 
 	prType, finalTitle := notes.PRTypeFromTitle(title)
 	if prType == notes.UncategorizedPR {
@@ -65,4 +67,17 @@ func verifyPRType(pr *github.PullRequest) (string, string, error) {
 
 	%s
 `, finalTitle), nil
+}
+
+func trimTitle(title string) string {
+	// Remove the WIP prefix if found.
+	title = wipRegex.ReplaceAllString(title, "")
+
+	// Trim to remove spaces after WIP.
+	title = strings.TrimSpace(title)
+
+	// Remove a tag prefix if found.
+	title = tagRegex.ReplaceAllString(title, "")
+
+	return strings.TrimSpace(title)
 }
