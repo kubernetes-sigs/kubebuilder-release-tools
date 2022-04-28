@@ -9,4 +9,4 @@ runs:
   # this is built using GCB by building the Dockerfile in this directory on
   # every tagged release.  After tagging a release, a new version should
   # automatically appear.
-  image: 'docker://gcr.io/kubebuilder/pr-verifier:v0.1.1'
+  image: 'docker://gcr.io/kubebuilder/pr-verifier:v0.2.0'
