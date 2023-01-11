@@ -32,10 +32,5 @@ func main() {
 			"Issue/PR tag in PR title",
 			checkIssueInTitle,
 		),
-		action.NewPlugin(
-			"PR Desc",
-			"Basic PR Descriptiveness Check",
-			checkPRDescriptiveness(80),
-		),
 	).Run()
 }
