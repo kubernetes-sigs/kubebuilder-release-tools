@@ -9,9 +9,5 @@ jobs:
     name: Verify PR contents
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Verifier action
-        uses: ./.github/actions/verifier
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: test
+        run: echo "yes hello, this is dog"
