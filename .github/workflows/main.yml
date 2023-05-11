@@ -4,6 +4,9 @@ on:
   pull_request:
     types: [opened, edited, reopened, synchronize]
 
+permissions:
+  checks: write # Allow access to checks to write check runs.
+  
 jobs:
   verify:
     name: Verify PR contents
