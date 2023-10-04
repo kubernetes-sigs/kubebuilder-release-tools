@@ -22,6 +22,7 @@ import (
 )
 
 type PRType int
+
 func (t PRType) Emoji() string {
 	switch t {
 	case UncategorizedPR:
@@ -55,7 +56,7 @@ func (t PRType) String() string {
 	case InfraPR:
 		return "infra"
 	default:
-		panic(fmt.Sprintf("unrecognized PR type %v", t))
+		panic(fmt.Sprintf("unrecognized PR type %d", int(t)))
 	}
 }
 
@@ -66,6 +67,7 @@ const (
 	BugfixPR
 	DocsPR
 	InfraPR
+	ReleasePR
 )
 
 // NB(directxman12): These are constants because some folks' dev environments like
@@ -80,6 +82,7 @@ const (
 	emojiInfra       = string('🌱')
 	emojiBreaking    = string('⚠')
 	emojiInfraLegacy = string('🏃')
+	emojiRelease     = string('🚀')
 )
 
 func PRTypeFromTitle(title string) (PRType, string) {
@@ -111,6 +114,10 @@ func PRTypeFromTitle(title string) (PRType, string) {
 		title = strings.TrimPrefix(title, ":warning:")
 		title = strings.TrimPrefix(title, emojiBreaking)
 		prType = BreakingPR
+	case strings.HasPrefix(title, ":rocket:"), strings.HasPrefix(title, emojiRelease):
+		title = strings.TrimPrefix(title, ":rocket:")
+		title = strings.TrimPrefix(title, emojiRelease)
+		prType = ReleasePR
 	case strings.HasPrefix(title, ":running:"), strings.HasPrefix(title, emojiInfraLegacy):
 		// This has been deprecated in favor of :seedling:
 		title = strings.TrimPrefix(title, ":running:")

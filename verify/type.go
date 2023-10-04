@@ -48,10 +48,11 @@ You need to have one of these as the prefix of your PR title:
 - Non-breaking feature: ✨ (%#q)
 - Patch fix: 🐛 (%#q)
 - Docs: 📖 (%#q)
+- Release: 🚀 (%#q)
 - Infra/Tests/Other: 🌱 (%#q)
 
 More details can be found at [sigs.k8s.io/kubebuilder-release-tools/VERSIONING.md](https://sigs.k8s.io/kubebuilder-release-tools/VERSIONING.md).`,
-		e.title, ":warning:", ":sparkles:", ":bug:", ":book:", ":seedling:")
+		e.title, ":warning:", ":sparkles:", ":bug:", ":book:", ":rocket:", ":seedling:")
 }
 
 // verifyPRType checks that the PR title contains a prefix that defines its type
