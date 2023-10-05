@@ -84,6 +84,7 @@ specifying the kind of change:
 - Non-breaking feature: :sparkles: (`:sparkles:`)
 - Patch fix: :bug: (`:bug:`)
 - Docs: :book: (`:book:`)
+- Release: :rocket: (`:rocket:`)
 - Infra/Tests/Other: :seedling: (`:seedling:`)
 
 See [the document](/VERSIONING.md) for more details.

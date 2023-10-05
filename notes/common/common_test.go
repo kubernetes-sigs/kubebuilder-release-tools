@@ -50,6 +50,8 @@ var _ = Describe("PR title parsing", func() {
 		Entry("should match infra from :seedling:", ":seedling: Update Go mod version to 1.15", InfraPR, "Update Go mod version to 1.15"),
 		Entry("should match infra from 🏃(deprecated)", "🏃 hack/setup-envtest.sh: follow-up from #1092", InfraPR, "hack/setup-envtest.sh: follow-up from #1092"),
 		Entry("should match infra from :running: (deprecated)", ":running: Proposal to extract cluster-specifics out of the Manager", InfraPR, "Proposal to extract cluster-specifics out of the Manager"),
+		Entry("should match release from :rocket:", ":rocket: release v0.0.1", ReleasePR, "release v0.0.1"),
+		Entry("should match release from 🚀", "🚀 release v0.0.1", ReleasePR, "release v0.0.1"),
 		Entry("should put anything else as uncategorized", "blah blah", UncategorizedPR, "blah blah"),
 	)
 
