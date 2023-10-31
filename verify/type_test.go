@@ -16,7 +16,45 @@ limitations under the License.
 
 package main
 
-import "testing"
+import (
+	"github.com/google/go-github/v32/github"
+	"testing"
+)
+
+func stringPointer(s string) *string {
+	return &s
+}
+
+func Test_verifyPRType(t *testing.T) {
+	tests := []struct {
+		name string
+		pr   *github.PullRequest
+		want string
+	}{
+		{
+			name: "Bugfix PR",
+			pr: &github.PullRequest{
+				Title: stringPointer(":bug: Fixing bug"),
+			},
+			want: "Found 🐛 PR (bugfix)",
+		},
+		{
+			name: "Release PR",
+			pr: &github.PullRequest{
+				Title: stringPointer(":rocket: Release v0.0.1"),
+			},
+			want: "Found 🚀 PR (release)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got, _, _ := verifyPRType(tt.pr); got != tt.want {
+				t.Errorf("verifyPRType() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 
 func Test_trimTitle(t *testing.T) {
 	tests := []struct {
