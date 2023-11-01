@@ -37,6 +37,8 @@ func (t PRType) Emoji() string {
 		return emojiDocs
 	case InfraPR:
 		return emojiInfra
+	case ReleasePR:
+		return emojiRelease
 	default:
 		panic(fmt.Sprintf("unrecognized PR type %v", t))
 	}
@@ -55,6 +57,8 @@ func (t PRType) String() string {
 		return "docs"
 	case InfraPR:
 		return "infra"
+	case ReleasePR:
+		return "release"
 	default:
 		panic(fmt.Sprintf("unrecognized PR type %d", int(t)))
 	}
