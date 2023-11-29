@@ -7,7 +7,7 @@ replace sigs.k8s.io/kubebuilder-release-tools/notes => ../notes
 require (
 	github.com/google/go-github/v32 v32.1.0
 	golang.org/x/oauth2 v0.8.0
-	sigs.k8s.io/kubebuilder-release-tools/notes v0.4.0
+	sigs.k8s.io/kubebuilder-release-tools/notes v0.4.2
 )
 
 require (
