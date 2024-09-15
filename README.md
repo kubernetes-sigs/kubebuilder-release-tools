@@ -16,7 +16,14 @@ $ go run sigs.k8s.io/kubebuilder-release-tools/notes
 $ go run sigs.k8s.io/kubebuilder-release-tools/notes -r beta
 ```
 
-## PR Verification GitHub Action
+## PR Verification GitHub Action (Deprecated)
+
+**IMPORTANT**: Images provided under `gcr.io/kubebuilder/` will be unavailable starting **March 18, 2025**. Therefore, this GitHub Action as described below will no longer work once the images are unavailable.
+
+> The functionality of this deprecated GitHub Action can be replicated using the current approach in the Kubebuilder project. Here’s how:
+> - Create a GitHub Action to trigger the validation, as demonstrated in the [Kubebuilder repository](https://github.com/kubernetes-sigs/kubebuilder/blob/master/.github/workflows/verify.yml).
+> - Ensure that the GitHub Action calls the necessary shell script for checks. You can find an example here: [pr-title-checker.sh](https://github.com/kubernetes-sigs/kubebuilder/blob/master/test/pr-title-checker.sh).
+
 
 This repository acts as a GitHub action for verifying PR titles match the
 [release notes generation requirements](/VERSIONING.md), as well as some
