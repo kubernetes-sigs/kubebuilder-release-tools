@@ -1,0 +1,9 @@
+name: "PR Title Validator"
+description: "Validates PR titles based on predefined conventions."
+inputs:
+  github-token:
+    description: "GitHub Token"
+    required: true
+runs:
+  using: "bash"
+  main: "../pr-title-checker.sh"

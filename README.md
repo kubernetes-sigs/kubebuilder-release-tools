@@ -51,6 +51,10 @@ jobs:
       uses: kubernetes-sigs/kubebuilder-release-tools@v0.2
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Run PR Title Validator from kubebuilder-release-tools
+      uses: kubernetes-sigs/kubebuilder-release-tools/.github/actions/pr-title-checker@main
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 The code that actually runs lives in [verify](/verify), while
